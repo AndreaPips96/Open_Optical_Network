@@ -23,4 +23,15 @@ for x in range(var1, var2+1):
     print(x+prev_x)
     prev_x = x
 
+# 3
+# creating an empty list
+lst = []
+# number of elements as input
+n = int(input("Insert number of elements : "))
 
+# iterating till the range
+for i in range(0, n):
+    elem = int(input())
+    lst.append(elem)  # adding the element to the list
+
+print(lst)
