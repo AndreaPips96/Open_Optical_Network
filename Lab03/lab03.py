@@ -96,34 +96,38 @@ class Network:
         # Given two node labels, this function returns all the paths that connect the two nodes
         # as list of node labels.
         # The admissible paths have to cross any node at most once.
-        # if node1 in self.nodes.keys() & node2 in self.nodes.keys():
-        #     source = self.nodes[node1]
-        #     dest = self.nodes[node2]
-
-        paths = []
-        index = 0
-        for label1 in self.nodes[node1].connected_nodes:
-            if label1 == node2:
-                paths.append(node1 + label1)  # direct link between node1 and node2
+        available_path = []
+        for i in range(len(self.nodes.keys()) - 1):
+            if i == 0:
+                possible_paths = self.generate(node1, self.nodes.keys())
+                for path in possible_paths:
+                    if path[-1] not in self.nodes[node1].connected_nodes:
+                        possible_paths.remove(path)
+                    elif path[-1] == node2:
+                        available_path.append(path)
             else:
-                crossed = node1 + label1
-                for label2 in self.nodes[label1].connected_nodes:
-                    if label2 == node2:
-                        crossed = crossed + label2
-                        paths.append(crossed)
-                    elif label2 in crossed:
-                        pass
-                    else:
-                        crossed = node1 + label1 + label2
-                        for label3 in self.nodes[label2].connected_nodes:
-                            if label3 == node2:
-                                paths.append(crossed + label3)
-                            elif label2 in crossed:
-                                pass
-                            else:
-                                pass
-        return paths
+                elem = range(len(possible_paths))
+                for j in elem:
+                    derived_paths = self.generate(possible_paths[0], self.nodes[possible_paths[0][-1]].connected_nodes)
+                    for path in derived_paths:
+                        aaa = path[-1]
+                        aab = path[-2]
+                        aac = self.nodes[path[-2]].connected_nodes
+                        if path[-1] not in self.nodes[path[-2]].connected_nodes:
+                            derived_paths.remove(path)
+                        elif path[-1] == node2:
+                            available_path.append(path)
+                            derived_paths.remove(path)
+                    possible_paths.pop(0)
+                    possible_paths += derived_paths
+        return available_path
 
+    def generate(self, string1, labels):
+        out = []
+        for letter in labels:
+            if letter not in string1:
+                out.append(string1+letter)
+        return out
 
 
 
