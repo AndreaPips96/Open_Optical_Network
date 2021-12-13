@@ -2,6 +2,8 @@
 import scipy.constants as sp
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
+
 
 class SignalInformation:
 
@@ -23,6 +25,7 @@ class SignalInformation:
         self.path = self.path[1:]
         # return self.path
 
+
 class Node:
 
     def __init__(self, label, dictionary):
@@ -37,7 +40,6 @@ class Node:
             # call the successive element propagate method, accordingly to the specified path.
             next_label = signal_info.path[0]
             self.successive[self.label + next_label].propagate(signal_info)
-
 
 
 class Line:
@@ -65,6 +67,7 @@ class Network:
     def __init__(self, my_dict):
         self.nodes = {}
         self.lines = {}
+        self.weighted_paths = pd.DataFrame()
 
         for key in my_dict:
             self.nodes[key] = Node(key, my_dict[key])
@@ -77,7 +80,6 @@ class Network:
 
                 self.lines[line_label] = Line(line_label, distance)
 
-
     def connect(self):
         for label in self.nodes:
             node = self.nodes[label]
@@ -89,7 +91,6 @@ class Network:
             line = self.lines[label]
             line.successive[line.label[0]] = self.nodes[line.label[0]]
             line.successive[line.label[1]] = self.nodes[line.label[1]]
-
 
     def find_paths(self, node1, node2):
         # Given two node labels, this function returns all the paths that connect the two nodes
@@ -129,13 +130,11 @@ class Network:
                 out.append(string1+letter)
         return out
 
-
     def propagate(self, signal_info):
         # This function has to propagate the signal information through the path specified in it
         # and returns the modified spectral information.
         node = self.nodes[signal_info.path[0]]
         node.propagate(signal_info)
-
 
     def draw(self):
         # this function has to draw the network using matplotlib
@@ -156,3 +155,51 @@ class Network:
         plt.title('Network topology')
         fig.savefig('Network_topology.png')
         plt.show()
+
+    # LAB 4
+    def find_best_snr(self, snode, dnode):
+        best_snr = 0
+        best_path = ""
+        for path in self.weighted_paths.index:
+            if path[0] == snode and path[-1] == dnode:
+                if self.weighted_paths.loc[path, 'SNR [dB]'] > best_snr:
+                    best_snr = self.weighted_paths.loc[path, 'SNR [dB]']
+                    best_path = path
+        return best_path, best_snr
+
+    def find_best_latency(self, snode, dnode):
+        best_lat = 1000
+        best_path = ""
+        for path in self.weighted_paths.index:
+            if path[0] == snode and path[-1] == dnode:
+                if self.weighted_paths.loc[path, 'Latency [s]'] < best_lat:
+                    best_lat = self.weighted_paths.loc[path, 'Latency [s]']
+                    best_path = path
+        return best_path, best_lat
+
+    def stream(self, connections, parameter='latency'):
+        for connection in connections:
+            if parameter == 'latency':
+                path, best_lat = self.find_best_latency(connection.input, connection.output)
+                signal = SignalInformation(path)
+                self.propagate(signal)
+                connection.latency = signal.latency
+                connection.snr = 10*np.log10(signal.signal_power/signal.noise_power)
+            elif parameter == 'snr':
+                path, best_snr = self.find_best_snr(connection.input, connection.output)
+                signal = SignalInformation(path)
+                self.propagate(signal)
+                connection.latency = signal.latency
+                connection.snr = 10 * np.log10(signal.signal_power / signal.noise_power)
+            else:
+                raise NameError('Wrong parameter')
+
+
+class Connection:
+
+    def __init__(self, snode, dnode):
+        self.input = snode              # string
+        self.output = dnode             # string
+        self.signal_power = 1.0e-03     # float
+        self.latency = 0.0              # float
+        self.snr = 0.0                  # float
