@@ -46,11 +46,13 @@ for path in paths:
 network_df['Latency [s]'] = latencies
 network_df['Noise_power [W]'] = noise
 network_df['SNR [dB]'] = snr
-print(network_df)
+# print(network_df)
 
 # LAB 4
 # Set weighted_paths attribute
 network.weighted_paths = network_df
+for lines in network.lines.values():
+    lines.state = 'free'
 
 # Find the best path for SNR
 # path, SNR = network.find_best_snr('A', 'F')
@@ -63,17 +65,18 @@ network.weighted_paths = network_df
 # Build 100 random connections
 connections = []
 for i in range(100):
-    path = random.choice(list(network.nodes.keys())) + random.choice(list(network.nodes.keys()))
-    while path[0] == path[1]:
-        path = path[:1] + random.choice(list(network.nodes.keys()))
-    connection = Connection(path[0], path[1])
+    source = random.choice(list(network.nodes.keys()))
+    destination = random.choice(list(network.nodes.keys()))
+    while source == destination:
+        destination = random.choice(list(network.nodes.keys()))
+    connection = Connection(source, destination)
     connections.append(connection)
 
-network.stream(connections)
-lat = [connection.latency for connection in connections]
-plt.figure()
-plt.hist(lat)                                           # MIGLIORARE PLOT
-plt.title('Latency distribution')
+# network.stream(connections)
+# lat = [connection.latency for connection in connections]
+# plt.figure()
+# plt.hist(lat)                                           # MIGLIORARE PLOT
+# plt.title('Latency distribution')
 network.stream(connections, parameter='snr')
 snr = [connection.snr for connection in connections]
 plt.figure()

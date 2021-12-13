@@ -36,7 +36,7 @@ class Node:
 
     def propagate(self, signal_info):
         signal_info.update_path()
-        if signal_info.path != "":
+        if signal_info.path != '':
             # call the successive element propagate method, accordingly to the specified path.
             next_label = signal_info.path[0]
             self.successive[self.label + next_label].propagate(signal_info)
@@ -48,6 +48,7 @@ class Line:
         self.label = label          # string
         self.length = length        # float
         self.successive = {}        # dict[]
+        self.state = 'free'         # string
 
     def latency_generation(self):
         return self.length/((2/3)*sp.speed_of_light)
@@ -56,8 +57,13 @@ class Line:
         return 1e-9*signal_power*self.length
 
     def propagate(self, signal_info):
+        """
+            Method to propagate a signal on all lines along a path
+        """
+        # Update power, noise and latency added by the line
         signal_info.update_powlat(0, self.noise_generation(signal_info.signal_power), self.latency_generation())
-
+        # Set line status to occupied then propagate signal
+        self.state = 'occupied'
         next_label = signal_info.path[0]
         self.successive[next_label].propagate(signal_info)
 
@@ -159,20 +165,38 @@ class Network:
     # LAB 4
     def find_best_snr(self, snode, dnode):
         best_snr = 0
-        best_path = ""
+        best_path = ''
+        # Scan all available paths
         for path in self.weighted_paths.index:
+            free = True
+            # Make computations only if source and destination nodes match
             if path[0] == snode and path[-1] == dnode:
-                if self.weighted_paths.loc[path, 'SNR [dB]'] > best_snr:
+                # Check path's lines status
+                for i in range(len(path)-1):
+                    if self.lines[path[i]+path[i+1]].state != 'free':
+                        # First occupied line makes all path unfeasible
+                        free = False
+                        break
+                if self.weighted_paths.loc[path, 'SNR [dB]'] > best_snr and free:
                     best_snr = self.weighted_paths.loc[path, 'SNR [dB]']
                     best_path = path
         return best_path, best_snr
 
     def find_best_latency(self, snode, dnode):
         best_lat = 1000
-        best_path = ""
+        best_path = ''
+        # Scan all available paths
         for path in self.weighted_paths.index:
+            free = True
+            # Make computations only if source and destination nodes match
             if path[0] == snode and path[-1] == dnode:
-                if self.weighted_paths.loc[path, 'Latency [s]'] < best_lat:
+                # Check path's lines status
+                for i in range(len(path)-1):
+                    if self.lines[path[i]+path[i+1]].state != 'free':
+                        # First occupied line makes all path unfeasible
+                        free = False
+                        break
+                if self.weighted_paths.loc[path, 'Latency [s]'] < best_lat and free:
                     best_lat = self.weighted_paths.loc[path, 'Latency [s]']
                     best_path = path
         return best_path, best_lat
@@ -181,16 +205,24 @@ class Network:
         for connection in connections:
             if parameter == 'latency':
                 path, best_lat = self.find_best_latency(connection.input, connection.output)
-                signal = SignalInformation(path)
-                self.propagate(signal)
-                connection.latency = signal.latency
-                connection.snr = 10*np.log10(signal.signal_power/signal.noise_power)
+                if path == '' and best_lat == 1000:
+                    connection.latency = 'None'
+                    connection.snr = 0
+                else:
+                    signal = SignalInformation(path)
+                    self.propagate(signal)
+                    connection.latency = signal.latency
+                    connection.snr = 10*np.log10(signal.signal_power/signal.noise_power)
             elif parameter == 'snr':
                 path, best_snr = self.find_best_snr(connection.input, connection.output)
-                signal = SignalInformation(path)
-                self.propagate(signal)
-                connection.latency = signal.latency
-                connection.snr = 10 * np.log10(signal.signal_power / signal.noise_power)
+                if path == '' and best_snr == 0:
+                    connection.latency = 'None'
+                    connection.snr = 0
+                else:
+                    signal = SignalInformation(path)
+                    self.propagate(signal)
+                    connection.latency = signal.latency
+                    connection.snr = 10 * np.log10(signal.signal_power / signal.noise_power)
             else:
                 raise NameError('Wrong parameter')
 
