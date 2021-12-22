@@ -73,13 +73,14 @@ for i in range(100):
     connections.append(connection)
 
 # network.stream(connections)
-# lat = [connection.latency for connection in connections]
+# lat = [connection.latency for connection in connections if connection.latency != 'None']
 # plt.figure()
 # plt.hist(lat)                                           # MIGLIORARE PLOT
 # plt.title('Latency distribution')
+# plt.xticks(rotation=45)
 network.stream(connections, parameter='snr')
-snr = [connection.snr for connection in connections]
-plt.figure()
-plt.hist(snr)                                           # MIGLIORARE PLOT
-plt.title('SNR distribution')
-plt.show()
+snr = [connection.snr for connection in connections if connection.snr != 0]
+# plt.figure()
+# plt.hist(snr)                                           # MIGLIORARE PLOT
+# plt.title('SNR distribution')
+# plt.show()
