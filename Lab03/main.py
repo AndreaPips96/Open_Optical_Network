@@ -88,8 +88,8 @@ for i in range(100):
 # plt.xticks(rotation=45)
 network.stream(connections, parameter='snr')
 snr = [connection.snr for connection in connections if connection.snr != 0]
-# plt.figure()
-# plt.hist(snr)                                           # MIGLIORARE PLOT
-# plt.title('SNR distribution')
-# plt.show()
+plt.figure()
+plt.hist(snr)                                           # MIGLIORARE PLOT
+plt.title('SNR distribution')
+plt.show()
 
