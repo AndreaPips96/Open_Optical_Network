@@ -3,6 +3,7 @@ import scipy.constants as sp
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
+from copy import deepcopy
 
 
 class SignalInformation:
@@ -34,21 +35,29 @@ class Node:
         self.connected_nodes = dictionary["connected_nodes"]    # list[string]
         self.successive = {}                                    # dict[Line]
 
-    def propagate(self, signal_info):
-        signal_info.update_path()
-        if signal_info.path != '':
+    def propagate(self, lightpath):
+        lightpath.update_path()
+        if lightpath.path != '':
             # call the successive element propagate method, accordingly to the specified path.
-            next_label = signal_info.path[0]
-            self.successive[self.label + next_label].propagate(signal_info)
+            next_label = lightpath.path[0]
+            self.successive[self.label + next_label].propagate(lightpath)
+
+    # LAB 5
+    def probe(self, lightpath):
+        lightpath.update_path()
+        if lightpath.path != '':
+            # call the successive element probe method, accordingly to the specified path.
+            next_label = lightpath.path[0]
+            self.successive[self.label + next_label].probe(lightpath)
 
 
 class Line:
 
     def __init__(self, label, length):
-        self.label = label          # string
-        self.length = length        # float
-        self.successive = {}        # dict[]
-        self.state = 'free'         # string
+        self.label = label              # string
+        self.length = length            # float
+        self.successive = {}            # dict[]
+        self.state = ['free']*10        # string - LAB 4 - LAB 5
 
     def latency_generation(self):
         return self.length/((2/3)*sp.speed_of_light)
@@ -56,16 +65,27 @@ class Line:
     def noise_generation(self, signal_power):
         return 1e-9*signal_power*self.length
 
-    def propagate(self, signal_info):
+    def propagate(self, lightpath):
         """
-            Method to propagate a signal on all lines along a path
+            Method to propagate a lightpath on all lines along a path
         """
         # Update power, noise and latency added by the line
-        signal_info.update_powlat(0, self.noise_generation(signal_info.signal_power), self.latency_generation())
-        # Set line status to occupied then propagate signal
-        self.state = 'occupied'
-        next_label = signal_info.path[0]
-        self.successive[next_label].propagate(signal_info)
+        lightpath.update_powlat(0, self.noise_generation(lightpath.signal_power), self.latency_generation())
+        # Set line status to occupied then propagate signal - LAB 4
+        self.state[lightpath.channel] = 'occupied'  # LAB 5
+        next_label = lightpath.path[0]
+        self.successive[next_label].propagate(lightpath)
+
+    # LAB 5
+    def probe(self, lightpath):
+        """
+            Method to propagate a lightpath on all lines along a path without occupying them
+        """
+        # Update power, noise and latency added by the line
+        lightpath.update_powlat(0, self.noise_generation(lightpath.signal_power), self.latency_generation())
+        # Set next line
+        next_label = lightpath.path[0]
+        self.successive[next_label].probe(lightpath)
 
 
 class Network:
@@ -74,6 +94,7 @@ class Network:
         self.nodes = {}
         self.lines = {}
         self.weighted_paths = pd.DataFrame()
+        self.route_space = pd.DataFrame()
 
         for key in my_dict:
             self.nodes[key] = Node(key, my_dict[key])
@@ -99,9 +120,11 @@ class Network:
             line.successive[line.label[1]] = self.nodes[line.label[1]]
 
     def find_paths(self, node1, node2):
-        # Given two node labels, this function returns all the paths that connect the two nodes
-        # as list of node labels.
-        # The admissible paths have to cross any node at most once.
+        """
+            Given two node labels, this function returns all the paths that connect the two nodes
+            as list of node labels.
+            The admissible paths have to cross any node at most once.
+        """
         available_path = []
         for i in range(len(self.nodes.keys()) - 1):
             if i == 0:
@@ -136,15 +159,19 @@ class Network:
                 out.append(string1+letter)
         return out
 
-    def propagate(self, signal_info):
-        # This function has to propagate the signal information through the path specified in it
-        # and returns the modified spectral information.
-        node = self.nodes[signal_info.path[0]]
-        node.propagate(signal_info)
+    def propagate(self, lightpath):
+        """
+            This function has to propagate the signal information through the path specified in it
+            and returns the modified spectral information.
+        """
+        node = self.nodes[lightpath.path[0]]
+        node.propagate(lightpath)
 
     def draw(self):
-        # this function has to draw the network using matplotlib
-        # (nodes as dots and connection as lines).
+        """
+            This function has to draw the network using matplotlib
+            (nodes as dots and connection as lines).
+        """
         fig = plt.figure()
         for label in self.nodes:
             node = self.nodes[label]
@@ -166,6 +193,7 @@ class Network:
     def find_best_snr(self, snode, dnode):
         best_snr = 0
         best_path = ''
+        ch = 0
         # Scan all available paths
         for path in self.weighted_paths.index:
             free = True
@@ -173,18 +201,26 @@ class Network:
             if path[0] == snode and path[-1] == dnode:
                 # Check path's lines status
                 for i in range(len(path)-1):
-                    if self.lines[path[i]+path[i+1]].state != 'free':
-                        # First occupied line makes all path unfeasible
+                    if 'free' not in self.lines[path[i]+path[i+1]].state:
+                        # First totally occupied line makes all path unfeasible
                         free = False
                         break
+                    # if self.lines[path[i]+path[i+1]].state != 'free':
+                    #     # First occupied line makes all path unfeasible
+                    #     free = False
+                    #     break
+                # free, ch = find_ch(path)
                 if self.weighted_paths.loc[path, 'SNR [dB]'] > best_snr and free:
-                    best_snr = self.weighted_paths.loc[path, 'SNR [dB]']
-                    best_path = path
-        return best_path, best_snr
+                    ch = self.find_ch(path)
+                    if ch != 0:
+                        best_snr = self.weighted_paths.loc[path, 'SNR [dB]']
+                        best_path = path
+        return best_path, best_snr, ch
 
     def find_best_latency(self, snode, dnode):
         best_lat = 1000
         best_path = ''
+        ch = 0
         # Scan all available paths
         for path in self.weighted_paths.index:
             free = True
@@ -192,39 +228,91 @@ class Network:
             if path[0] == snode and path[-1] == dnode:
                 # Check path's lines status
                 for i in range(len(path)-1):
-                    if self.lines[path[i]+path[i+1]].state != 'free':
-                        # First occupied line makes all path unfeasible
+                    if 'free' not in self.lines[path[i]+path[i+1]].state:
+                        # First totally occupied line makes all path unfeasible
                         free = False
                         break
+                    # if self.lines[path[i]+path[i+1]].state != 'free':
+                    #     # First occupied line makes all path unfeasible
+                    #     free = False
+                    #     break
                 if self.weighted_paths.loc[path, 'Latency [s]'] < best_lat and free:
-                    best_lat = self.weighted_paths.loc[path, 'Latency [s]']
-                    best_path = path
-        return best_path, best_lat
+                    ch = self.find_ch(path)
+                    if ch != 0:
+                        best_lat = self.weighted_paths.loc[path, 'Latency [s]']
+                        best_path = path
+        return best_path, best_lat, ch
 
     def stream(self, connections, parameter='latency'):
         for connection in connections:
             if parameter == 'latency':
-                path, best_lat = self.find_best_latency(connection.input, connection.output)
+                path, best_lat, channel = self.find_best_latency(connection.input, connection.output)
                 if path == '' and best_lat == 1000:
                     connection.latency = 'None'
                     connection.snr = 0
                 else:
-                    signal = SignalInformation(path)
+                    print(path, best_lat, channel)
+                    signal = LightPath(channel-1, path)
                     self.propagate(signal)
                     connection.latency = signal.latency
                     connection.snr = 10*np.log10(signal.signal_power/signal.noise_power)
+                    self.update_route_space(path)
             elif parameter == 'snr':
-                path, best_snr = self.find_best_snr(connection.input, connection.output)
-                if path == '' and best_snr == 0:
+                path, best_snr, channel = self.find_best_snr(connection.input, connection.output)
+                if (path == '' and best_snr == 0) or channel == 0:
                     connection.latency = 'None'
                     connection.snr = 0
                 else:
-                    signal = SignalInformation(path)
+                    print(path, best_snr, channel)
+                    signal = LightPath(channel-1, path)
                     self.propagate(signal)
                     connection.latency = signal.latency
                     connection.snr = 10 * np.log10(signal.signal_power / signal.noise_power)
+                    self.update_route_space(path)
             else:
-                raise NameError('Wrong parameter')
+                raise NameError('Wrong parameter: nor \'latency\' nor \'snr\' inserted')
+
+    # LAB 5
+    def probe(self, lightpath):
+        """
+            This function has to propagate the lightpath information through the path specified in it
+            and returns the modified spectral information.
+        """
+        node = self.nodes[lightpath.path[0]]
+        node.probe(lightpath)
+
+    def build_route_space(self):
+        route_space = pd.DataFrame(index=self.weighted_paths.index, columns=self.lines)
+        for line in self.lines.values():
+            for path in self.weighted_paths.index:
+                if line.label in path:
+                    route_space.loc[path][line.label] = deepcopy(line.state)
+        self.route_space = route_space
+
+    def update_route_space(self, path):
+        line = path[0]
+        for i in path[1:]:
+            line += i
+            for route in self.route_space.index:
+                if line in route:
+                    self.route_space.loc[route][line] = deepcopy(self.lines[line].state)
+            line = i
+
+    def find_ch(self, path):
+        row = self.route_space.loc[[path]]
+        notnull_col = []
+        free_indices = []
+        for col in row:
+            if not row[col].isnull().values.any():
+                notnull_col.append(col)
+                free_indices.append([i+1 for i, x in enumerate(row[col].values.any()) if x == 'free'])
+        common_index = set(free_indices[0])
+        for idx in free_indices[1:]:
+            common_index.intersection_update(idx)
+        if len(common_index) == 0:
+            return 0
+        else:
+            return common_index.pop()
 
 
 class Connection:
@@ -235,3 +323,13 @@ class Connection:
         self.signal_power = 1.0e-03     # float
         self.latency = 0.0              # float
         self.snr = 0.0                  # float
+
+
+# LAB 5
+class LightPath(SignalInformation):
+
+    def __init__(self, slot, path):
+        SignalInformation.__init__(self, path)
+        self.channel = slot  # integer
+        # super().__init__(slot)
+

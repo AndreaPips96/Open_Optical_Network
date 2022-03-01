@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from useful_classes import Network
 from useful_classes import SignalInformation
 from useful_classes import Connection
+from useful_classes import LightPath
 
 # Open and import JSON file
 f = open('nodes.json')
@@ -37,8 +38,9 @@ latencies = []
 noise = []
 snr = []
 for path in paths:
-    signal = SignalInformation(path)
-    network.propagate(signal)
+    # signal = SignalInformation(path)
+    signal = LightPath(1, path)
+    network.probe(signal)
     latencies.append(signal.latency)
     noise.append(signal.noise_power)
     snr.append(10*np.log10(signal.signal_power/signal.noise_power))
@@ -48,14 +50,20 @@ network_df['Noise_power [W]'] = noise
 network_df['SNR [dB]'] = snr
 # print(network_df)
 
-# LAB 4
+# LAB 4 (propagate) + LAB 5 (probe)
 # Set weighted_paths attribute
 network.weighted_paths = network_df
-for lines in network.lines.values():
-    lines.state = 'free'
+# LAB 5
+# Set route_space attribute
+# network.route_space = pd.DataFrame([[line.state for line in network.lines.values()]], index=paths, columns=network.lines)
+network.build_route_space()
+
+# 'Channel#' + str(i+1) for i in range(10)]
+# for lines in network.lines.values():
+#     lines.state = 'free'
 
 # Find the best path for SNR
-# path, SNR = network.find_best_snr('A', 'F')
+# path, SNR, ch = network.find_best_snr('A', 'F')
 # print("{:.2f}".format(SNR)+'dB', path)
 
 # Find the best path for Latency
@@ -84,3 +92,4 @@ snr = [connection.snr for connection in connections if connection.snr != 0]
 # plt.hist(snr)                                           # MIGLIORARE PLOT
 # plt.title('SNR distribution')
 # plt.show()
+
