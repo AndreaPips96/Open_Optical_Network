@@ -5,6 +5,9 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from copy import deepcopy
 
+free = 1
+occupied = 0
+
 
 class SignalInformation:
 
@@ -57,7 +60,7 @@ class Line:
         self.label = label              # string
         self.length = length            # float
         self.successive = {}            # dict[]
-        self.state = ['free']*10        # string - LAB 4 - LAB 5
+        self.state = [free]*10        # string - LAB 4 - LAB 5
 
     def latency_generation(self):
         return self.length/((2/3)*sp.speed_of_light)
@@ -72,7 +75,7 @@ class Line:
         # Update power, noise and latency added by the line
         lightpath.update_powlat(0, self.noise_generation(lightpath.signal_power), self.latency_generation())
         # Set line status to occupied then propagate signal - LAB 4
-        self.state[lightpath.channel] = 'occupied'  # LAB 5
+        self.state[lightpath.channel] = occupied  # LAB 5
         next_label = lightpath.path[0]
         self.successive[next_label].propagate(lightpath)
 
@@ -196,21 +199,21 @@ class Network:
         ch = 0
         # Scan all available paths
         for path in self.weighted_paths.index:
-            free = True
+            there_is_space = True
             # Make computations only if source and destination nodes match
             if path[0] == snode and path[-1] == dnode:
                 # Check path's lines status
                 for i in range(len(path)-1):
-                    if 'free' not in self.lines[path[i]+path[i+1]].state:
+                    if free not in self.lines[path[i]+path[i+1]].state:
                         # First totally occupied line makes all path unfeasible
-                        free = False
+                        there_is_space = False
                         break
-                    # if self.lines[path[i]+path[i+1]].state != 'free':
+                    # if self.lines[path[i]+path[i+1]].state != free:
                     #     # First occupied line makes all path unfeasible
                     #     free = False
                     #     break
                 # free, ch = find_ch(path)
-                if self.weighted_paths.loc[path, 'SNR [dB]'] > best_snr and free:
+                if self.weighted_paths.loc[path, 'SNR [dB]'] > best_snr and there_is_space:
                     ch = self.find_ch(path)
                     if ch != 0:
                         best_snr = self.weighted_paths.loc[path, 'SNR [dB]']
@@ -223,20 +226,20 @@ class Network:
         ch = 0
         # Scan all available paths
         for path in self.weighted_paths.index:
-            free = True
+            there_is_space = True
             # Make computations only if source and destination nodes match
             if path[0] == snode and path[-1] == dnode:
                 # Check path's lines status
                 for i in range(len(path)-1):
-                    if 'free' not in self.lines[path[i]+path[i+1]].state:
+                    if free not in self.lines[path[i]+path[i+1]].state:
                         # First totally occupied line makes all path unfeasible
-                        free = False
+                        there_is_space = False
                         break
-                    # if self.lines[path[i]+path[i+1]].state != 'free':
+                    # if self.lines[path[i]+path[i+1]].state != free:
                     #     # First occupied line makes all path unfeasible
                     #     free = False
                     #     break
-                if self.weighted_paths.loc[path, 'Latency [s]'] < best_lat and free:
+                if self.weighted_paths.loc[path, 'Latency [s]'] < best_lat and there_is_space:
                     ch = self.find_ch(path)
                     if ch != 0:
                         best_lat = self.weighted_paths.loc[path, 'Latency [s]']
@@ -305,14 +308,15 @@ class Network:
         for col in row:
             if not row[col].isnull().values.any():
                 notnull_col.append(col)
-                free_indices.append([i+1 for i, x in enumerate(row[col].values.any()) if x == 'free'])
-        common_index = set(free_indices[0])
-        for idx in free_indices[1:]:
-            common_index.intersection_update(idx)
+                free_indices.append([i+1 for i, x in enumerate(row[col].values.any()) if x == free])
+        # common_index = set(free_indices[0])
+        # for idx in free_indices[1:]:
+        #     common_index.intersection_update(set(idx))
+        common_index = set(free_indices[0]).intersection(*free_indices)
         if len(common_index) == 0:
             return 0
         else:
-            return common_index.pop()
+            return min(common_index)
 
 
 class Connection:
