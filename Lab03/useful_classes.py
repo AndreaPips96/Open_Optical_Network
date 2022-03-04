@@ -312,7 +312,7 @@ class Network:
         if len(common_index) == 0:
             return 0
         else:
-            return common_index.pop()
+            return min(common_index)
 
 
 class Connection:
