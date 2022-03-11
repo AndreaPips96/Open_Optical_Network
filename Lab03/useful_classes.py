@@ -12,10 +12,10 @@ occupied = 0
 class SignalInformation:
 
     def __init__(self, path):
-        self.signal_power = 1.0e-03                  # float
-        self.noise_power = 0.0                      # float
-        self.latency = 0.0                          # float
-        self.path = path                            # list[string]
+        self.signal_power = 1.0e-03  # float
+        self.noise_power = 0.0  # float
+        self.latency = 0.0  # float
+        self.path = path  # list[string]
 
     def update_powlat(self, s_power, n_power, latency):
         # update powers and latency
@@ -33,10 +33,11 @@ class SignalInformation:
 class Node:
 
     def __init__(self, label, dictionary):
-        self.label = label                                      # string
-        self.position = dictionary["position"]                  # tuple(float, float)
-        self.connected_nodes = dictionary["connected_nodes"]    # list[string]
-        self.successive = {}                                    # dict[Line]
+        self.label = label  # string
+        self.position = dictionary["position"]  # tuple(float, float)
+        self.connected_nodes = dictionary["connected_nodes"]  # list[string]
+        self.successive = {}  # dict[Line]
+        self.switching_matrix = None  # LAB 6 - dict[dict[]]
 
     def propagate(self, lightpath):
         lightpath.update_path()
@@ -57,16 +58,16 @@ class Node:
 class Line:
 
     def __init__(self, label, length):
-        self.label = label              # string
-        self.length = length            # float
-        self.successive = {}            # dict[]
-        self.state = [free]*10        # string - LAB 4 - LAB 5
+        self.label = label  # string
+        self.length = length  # float
+        self.successive = {}  # dict[]
+        self.state = np.array([free] * 10)  # string - LAB 4 - LAB 5 - LAB 6
 
     def latency_generation(self):
-        return self.length/((2/3)*sp.speed_of_light)
+        return self.length / ((2 / 3) * sp.speed_of_light)
 
     def noise_generation(self, signal_power):
-        return 1e-9*signal_power*self.length
+        return 1e-9 * signal_power * self.length
 
     def propagate(self, lightpath):
         """
@@ -106,16 +107,22 @@ class Network:
                 line_label = (key + element)
                 pos = np.array(self.nodes[key].position)
                 next_pos = np.array(my_dict[element]["position"])
-                distance = np.sqrt(np.sum((pos - next_pos)**2))
+                distance = np.sqrt(np.sum((pos - next_pos) ** 2))
 
                 self.lines[line_label] = Line(line_label, distance)
 
     def connect(self):
         for label in self.nodes:
             node = self.nodes[label]
+            first = True
             for con_node in node.connected_nodes:
                 con_line = node.label + con_node
                 node.successive[con_line] = self.lines[con_line]
+                if first:
+                    first = False
+                    node.switching_matrix = self.build_switching_matrix(label, con_node)
+                else:
+                    node.switching_matrix.update(self.build_switching_matrix(label, con_node))
 
         for label in self.lines:
             line = self.lines[label]
@@ -159,7 +166,7 @@ class Network:
         out = []
         for letter in labels:
             if letter not in string1:
-                out.append(string1+letter)
+                out.append(string1 + letter)
         return out
 
     def propagate(self, lightpath):
@@ -203,8 +210,8 @@ class Network:
             # Make computations only if source and destination nodes match
             if path[0] == snode and path[-1] == dnode:
                 # Check path's lines status
-                for i in range(len(path)-1):
-                    if free not in self.lines[path[i]+path[i+1]].state:
+                for i in range(len(path) - 1):
+                    if free not in self.lines[path[i] + path[i + 1]].state:
                         # First totally occupied line makes all path unfeasible
                         there_is_space = False
                         break
@@ -230,8 +237,8 @@ class Network:
             # Make computations only if source and destination nodes match
             if path[0] == snode and path[-1] == dnode:
                 # Check path's lines status
-                for i in range(len(path)-1):
-                    if free not in self.lines[path[i]+path[i+1]].state:
+                for i in range(len(path) - 1):
+                    if free not in self.lines[path[i] + path[i + 1]].state:
                         # First totally occupied line makes all path unfeasible
                         there_is_space = False
                         break
@@ -247,6 +254,7 @@ class Network:
         return best_path, best_lat, ch
 
     def stream(self, connections, parameter='latency'):
+        i = 1
         for connection in connections:
             if parameter == 'latency':
                 path, best_lat, channel = self.find_best_latency(connection.input, connection.output)
@@ -255,10 +263,10 @@ class Network:
                     connection.snr = 0
                 else:
                     print(path, best_lat, channel)
-                    signal = LightPath(channel-1, path)
+                    signal = LightPath(channel - 1, path)
                     self.propagate(signal)
                     connection.latency = signal.latency
-                    connection.snr = 10*np.log10(signal.signal_power/signal.noise_power)
+                    connection.snr = 10 * np.log10(signal.signal_power / signal.noise_power)
                     self.update_route_space(path)
             elif parameter == 'snr':
                 path, best_snr, channel = self.find_best_snr(connection.input, connection.output)
@@ -266,8 +274,9 @@ class Network:
                     connection.latency = 'None'
                     connection.snr = 0
                 else:
-                    print(path, best_snr, channel)
-                    signal = LightPath(channel-1, path)
+                    print(path, best_snr, channel, i)
+                    i = i+1
+                    signal = LightPath(channel - 1, path)
                     self.propagate(signal)
                     connection.latency = signal.latency
                     connection.snr = 10 * np.log10(signal.signal_power / signal.noise_power)
@@ -293,13 +302,30 @@ class Network:
         self.route_space = route_space
 
     def update_route_space(self, path):
-        line = path[0]
-        for i in path[1:]:
-            line += i
+        # line = path[0]
+        # for i in path[1:]:
+        #     line += i
+        #     for route in self.route_space.index:
+        #         if line in route:
+        #             self.route_space.loc[route][line] = deepcopy(self.lines[line].state)
+        #             # linea sotto sbagliata ma per reference
+        #             # self.route_space.loc[route][line] = self.lines[line].state * \
+        #             #                                     self.nodes[i].switching_matrix[line[0]][line[1]]    # LAB 6
+        #     line = i
+        if len(path) < 3:
             for route in self.route_space.index:
-                if line in route:
-                    self.route_space.loc[route][line] = deepcopy(self.lines[line].state)
-            line = i
+                if path in route:
+                    self.route_space.loc[route][path] = deepcopy(self.lines[path].state)
+        else:
+            for i in list(range(1, len(path)-1)):
+                for j in range(2):
+                    line = path[i-(1-j): i+(j+1)]
+                    for route in self.route_space.index:
+                        if line in route:
+                            # LAB 6
+                            self.route_space.loc[route][line] = np.multiply(self.lines[line].state,
+                                                                            self.nodes[path[i]]
+                                                                                .switching_matrix[path[i-1]][path[i+1]])
 
     def find_ch(self, path):
         row = self.route_space.loc[[path]]
@@ -308,7 +334,7 @@ class Network:
         for col in row:
             if not row[col].isnull().values.any():
                 notnull_col.append(col)
-                free_indices.append([i+1 for i, x in enumerate(row[col].values.any()) if x == free])
+                free_indices.append([i + 1 for i, x in enumerate(row[col].values.any()) if x == free])
         # common_index = set(free_indices[0])
         # for idx in free_indices[1:]:
         #     common_index.intersection_update(set(idx))
@@ -318,15 +344,26 @@ class Network:
         else:
             return min(common_index)
 
+    # LAB 6
+    def build_switching_matrix(self, node, label1):
+        switching_matrix = {}
+        switching_matrix[label1] = {}
+        for label2 in self.nodes[node].connected_nodes:
+            if label1 == label2:
+                switching_matrix[label1][label2] = np.array([occupied] * 10)
+            else:
+                switching_matrix[label1][label2] = np.array([free] * 10)
+        return switching_matrix
+
 
 class Connection:
 
     def __init__(self, snode, dnode):
-        self.input = snode              # string
-        self.output = dnode             # string
-        self.signal_power = 1.0e-03     # float
-        self.latency = 0.0              # float
-        self.snr = 0.0                  # float
+        self.input = snode  # string
+        self.output = dnode  # string
+        self.signal_power = 1.0e-03  # float
+        self.latency = 0.0  # float
+        self.snr = 0.0  # float
 
 
 # LAB 5
@@ -336,4 +373,3 @@ class LightPath(SignalInformation):
         SignalInformation.__init__(self, path)
         self.channel = slot  # integer
         # super().__init__(slot)
-

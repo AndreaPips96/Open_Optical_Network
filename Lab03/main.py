@@ -72,7 +72,7 @@ network.build_route_space()
 
 # Build 100 random connections
 connections = []
-for i in range(100):
+for i in range(200):
     source = random.choice(list(network.nodes.keys()))
     destination = random.choice(list(network.nodes.keys()))
     while source == destination:
