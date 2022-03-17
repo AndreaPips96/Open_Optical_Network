@@ -320,12 +320,13 @@ class Network:
             for i in list(range(1, len(path)-1)):
                 for j in range(2):
                     line = path[i-(1-j): i+(j+1)]
+                    # print(path[i - 1], path[i + 1], '\t'+line)
                     for route in self.route_space.index:
                         if line in route:
                             # LAB 6
-                            self.route_space.loc[route][line] = np.multiply(self.lines[line].state,
-                                                                            self.nodes[path[i]]
-                                                                                .switching_matrix[path[i-1]][path[i+1]])
+                            self.route_space.loc[route][line] = \
+                                np.multiply(self.lines[line].state,
+                                            self.nodes[path[i]].switching_matrix[path[i-1]][path[i+1]])
 
     def find_ch(self, path):
         row = self.route_space.loc[[path]]
