@@ -10,7 +10,8 @@ from useful_classes import Connection
 from useful_classes import LightPath
 
 # Open and import JSON file
-f = open('nodes.json')
+f = open('Lab03/nodes.json')
+# f = open('Lab07/nodes_full.json')
 nodes_dict = json.load(f)
 f.close()
 # print(nodes_dict)
@@ -72,7 +73,7 @@ network.build_route_space()
 
 # Build 100 random connections
 connections = []
-for i in range(200):
+for i in range(100):
     source = random.choice(list(network.nodes.keys()))
     destination = random.choice(list(network.nodes.keys()))
     while source == destination:
@@ -91,5 +92,6 @@ snr = [connection.snr for connection in connections if connection.snr != 0]
 # plt.figure()
 # plt.hist(snr)                                           # MIGLIORARE PLOT
 # plt.title('SNR distribution')
+# plt.xticks(rotation=45)
 # plt.show()
 
