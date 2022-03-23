@@ -103,6 +103,16 @@ class Network:
         for key in my_dict:
             self.nodes[key] = Node(key, my_dict[key])
 
+            # LAB7
+            first = True
+            for con_node in my_dict[key]['switching_matrix']:
+                if first:
+                    first = False
+                    self.nodes[key].switching_matrix = self.build_switching_matrix(key, con_node, my_dict)
+                else:
+                    self.nodes[key].switching_matrix.update(self.build_switching_matrix(key, con_node, my_dict))
+            #
+
             for element in self.nodes[key].connected_nodes:
                 line_label = (key + element)
                 pos = np.array(self.nodes[key].position)
@@ -114,15 +124,15 @@ class Network:
     def connect(self):
         for label in self.nodes:
             node = self.nodes[label]
-            first = True
+            # first = True
             for con_node in node.connected_nodes:
                 con_line = node.label + con_node
                 node.successive[con_line] = self.lines[con_line]
-                if first:
-                    first = False
-                    node.switching_matrix = self.build_switching_matrix(label, con_node)
-                else:
-                    node.switching_matrix.update(self.build_switching_matrix(label, con_node))
+                # if first:
+                #     first = False
+                #     node.switching_matrix = self.build_switching_matrix(label, con_node)
+                # else:
+                #     node.switching_matrix.update(self.build_switching_matrix(label, con_node))
 
         for label in self.lines:
             line = self.lines[label]
@@ -346,11 +356,13 @@ class Network:
             return min(common_index)
 
     # LAB 6
-    def build_switching_matrix(self, node, label1):
+    def build_switching_matrix(self, node, label1, my_dict):
         switching_matrix = {}
         switching_matrix[label1] = {}
         for label2 in self.nodes[node].connected_nodes:
-            if label1 == label2:
+            # if label1 == label2:
+            # LAB7
+            if 0 in my_dict[node]['switching_matrix'][label1][label2]:
                 switching_matrix[label1][label2] = np.array([occupied] * 10)
             else:
                 switching_matrix[label1][label2] = np.array([free] * 10)

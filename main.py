@@ -10,8 +10,9 @@ from useful_classes import Connection
 from useful_classes import LightPath
 
 # Open and import JSON file
-f = open('Lab03/nodes.json')
+# f = open('Lab03/nodes.json')
 # f = open('Lab07/nodes_full.json')
+f = open('Lab07/nodes_not_full.json')
 nodes_dict = json.load(f)
 f.close()
 # print(nodes_dict)
@@ -89,9 +90,9 @@ for i in range(100):
 # plt.xticks(rotation=45)
 network.stream(connections, parameter='snr')
 snr = [connection.snr for connection in connections if connection.snr != 0]
-# plt.figure()
-# plt.hist(snr)                                           # MIGLIORARE PLOT
-# plt.title('SNR distribution')
-# plt.xticks(rotation=45)
-# plt.show()
+plt.figure()
+plt.hist(snr)                                           # MIGLIORARE PLOT
+plt.title('SNR distribution')
+plt.xticks(rotation=45)
+plt.show()
 
