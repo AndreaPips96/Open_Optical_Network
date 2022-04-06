@@ -35,10 +35,14 @@ class Node:
 
     def __init__(self, label, dictionary):
         self.label = label                                      # string
-        self.position = dictionary["position"]                  # tuple(float, float)
-        self.connected_nodes = dictionary["connected_nodes"]    # list[string]
+        self.position = dictionary['position']                  # tuple(float, float)
+        self.connected_nodes = dictionary['connected_nodes']    # list[string]
         self.successive = {}                                    # dict[Line]
         self.switching_matrix = None                            # LAB 6 - dict[dict[]]
+        if 'transceiver' in dictionary.keys():                  # LAB 7 - string
+            self.transceiver = dictionary['transceiver']
+        else:
+            self.transceiver = 'fixed_rate'
 
     def propagate(self, lightpath):
         # LAB 7
@@ -131,7 +135,7 @@ class Network:
             for element in self.nodes[key].connected_nodes:
                 line_label = (key + element)
                 pos = np.array(self.nodes[key].position)
-                next_pos = np.array(my_dict[element]["position"])
+                next_pos = np.array(my_dict[element]['position'])
                 distance = np.sqrt(np.sum((pos - next_pos) ** 2))
 
                 self.lines[line_label] = Line(line_label, distance)
