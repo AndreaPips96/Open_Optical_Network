@@ -4,9 +4,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 from copy import deepcopy
+from Lab07 import utils_and_param as up
 
-free = 1
-occupied = 0
+# free = 1
+# occupied = 0
 
 
 class SignalInformation:
@@ -33,13 +34,23 @@ class SignalInformation:
 class Node:
 
     def __init__(self, label, dictionary):
-        self.label = label  # string
-        self.position = dictionary["position"]  # tuple(float, float)
-        self.connected_nodes = dictionary["connected_nodes"]  # list[string]
-        self.successive = {}  # dict[Line]
-        self.switching_matrix = None  # LAB 6 - dict[dict[]]
+        self.label = label                                      # string
+        self.position = dictionary["position"]                  # tuple(float, float)
+        self.connected_nodes = dictionary["connected_nodes"]    # list[string]
+        self.successive = {}                                    # dict[Line]
+        self.switching_matrix = None                            # LAB 6 - dict[dict[]]
 
     def propagate(self, lightpath):
+        # LAB 7
+        # set side channel occupancy
+        if len(lightpath.path) > 2:
+            if lightpath.channel+1 < 10:
+                self.successive[lightpath.path[:2]].successive[lightpath.path[1]].switching_matrix[lightpath.path[0]][
+                    lightpath.path[2]][lightpath.channel+1] = up.occupied
+            if lightpath.channel-1 >= 0:
+                self.successive[lightpath.path[:2]].successive[lightpath.path[1]].switching_matrix[lightpath.path[0]][
+                    lightpath.path[2]][lightpath.channel-1] = up.occupied
+
         lightpath.update_path()
         if lightpath.path != '':
             # call the successive element propagate method, accordingly to the specified path.
@@ -61,7 +72,7 @@ class Line:
         self.label = label  # string
         self.length = length  # float
         self.successive = {}  # dict[]
-        self.state = np.array([free] * 10)  # string - LAB 4 - LAB 5 - LAB 6
+        self.state = np.array([up.free] * 10)  # string - LAB 4 - LAB 5 - LAB 6
 
     def latency_generation(self):
         return self.length / ((2 / 3) * sp.speed_of_light)
@@ -76,7 +87,7 @@ class Line:
         # Update power, noise and latency added by the line
         lightpath.update_powlat(0, self.noise_generation(lightpath.signal_power), self.latency_generation())
         # Set line status to occupied then propagate signal - LAB 4
-        self.state[lightpath.channel] = occupied  # LAB 5
+        self.state[lightpath.channel] = up.occupied  # LAB 5
         next_label = lightpath.path[0]
         self.successive[next_label].propagate(lightpath)
 
@@ -99,11 +110,15 @@ class Network:
         self.lines = {}
         self.weighted_paths = pd.DataFrame()
         self.route_space = pd.DataFrame()
+        self.default_switching_matrices = {}
 
         for key in my_dict:
             self.nodes[key] = Node(key, my_dict[key])
 
             # LAB7
+            self.default_switching_matrices[key] = my_dict[key]['switching_matrix']
+            # easier way to build the switching matrix BUT needs np.array() before multiplication taken
+            # self.nodes[key].switching_matrix = np.array(my_dict[key]['switching_matrix'])
             first = True
             for con_node in my_dict[key]['switching_matrix']:
                 if first:
@@ -221,7 +236,7 @@ class Network:
             if path[0] == snode and path[-1] == dnode:
                 # Check path's lines status
                 for i in range(len(path) - 1):
-                    if free not in self.lines[path[i] + path[i + 1]].state:
+                    if up.free not in self.lines[path[i] + path[i + 1]].state:
                         # First totally occupied line makes all path unfeasible
                         there_is_space = False
                         break
@@ -248,7 +263,7 @@ class Network:
             if path[0] == snode and path[-1] == dnode:
                 # Check path's lines status
                 for i in range(len(path) - 1):
-                    if free not in self.lines[path[i] + path[i + 1]].state:
+                    if up.free not in self.lines[path[i] + path[i + 1]].state:
                         # First totally occupied line makes all path unfeasible
                         there_is_space = False
                         break
@@ -293,6 +308,11 @@ class Network:
                     self.update_route_space(path)
             else:
                 raise NameError('Wrong parameter: nor \'latency\' nor \'snr\' inserted')
+
+        for node in self.nodes:
+            self.nodes[node].switching_matrix = dict(self.default_switching_matrices[node])
+        # for line in self.lines:
+        #     self.lines[line].state = np.array([free] * 10)
 
     # LAB 5
     def probe(self, lightpath):
@@ -345,7 +365,7 @@ class Network:
         for col in row:
             if not row[col].isnull().values.any():
                 notnull_col.append(col)
-                free_indices.append([i + 1 for i, x in enumerate(row[col].values.any()) if x == free])
+                free_indices.append([i + 1 for i, x in enumerate(row[col].values.any()) if x == up.free])
         # common_index = set(free_indices[0])
         # for idx in free_indices[1:]:
         #     common_index.intersection_update(set(idx))
@@ -363,10 +383,22 @@ class Network:
             # if label1 == label2:
             # LAB7
             if 0 in my_dict[node]['switching_matrix'][label1][label2]:
-                switching_matrix[label1][label2] = np.array([occupied] * 10)
+                switching_matrix[label1][label2] = np.array([up.occupied] * 10)
             else:
-                switching_matrix[label1][label2] = np.array([free] * 10)
+                switching_matrix[label1][label2] = np.array([up.free] * 10)
         return switching_matrix
+
+    # LAB 7
+    def calculate_bit_rate(self, path, strategy):
+        if strategy == 'fixed_rate':
+            Rb = up.fixed_bit_rate(self.weighted_paths.loc[path, 'SNR [dB]'])
+        elif strategy == 'flex_rate':
+            Rb = up.flex_bit_rate(self.weighted_paths.loc[path, 'SNR [dB]'])
+        elif strategy == 'shannon':
+            Rb = up.shannon_bit_rate(self.weighted_paths.loc[path, 'SNR [dB]'])
+        else:
+            raise NameError('Wrong strategy: nor \'fixed_rate\' nor \'flex_rate\' nor \'shannon\' inserted')
+        return Rb
 
 
 class Connection:
