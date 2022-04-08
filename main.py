@@ -12,7 +12,8 @@ from useful_classes import LightPath
 # Open and import JSON file
 # f = open('Lab03/nodes.json')
 # f = open('Lab07/nodes_full.json')
-f = open('Lab07/nodes_not_full.json')
+# f = open('Lab07/nodes_not_full.json')
+f = open('Lab07/nodes_full_shannon.json')
 nodes_dict = json.load(f)
 f.close()
 # print(nodes_dict)
@@ -88,11 +89,19 @@ for i in range(100):
 # plt.hist(lat)                                           # MIGLIORARE PLOT
 # plt.title('Latency distribution')
 # plt.xticks(rotation=45)
+
 network.stream(connections, parameter='snr')
 snr = [connection.snr for connection in connections if connection.snr != 0]
 plt.figure()
 plt.hist(snr)                                           # MIGLIORARE PLOT
 plt.title('SNR distribution')
 plt.xticks(rotation=45)
+
+bit_rates = [connection.Rb for connection in connections if connection.Rb != 0]
+plt.figure()
+plt.hist(bit_rates)                                           # MIGLIORARE PLOT
+plt.title('Bit rate allocation distribution')
+plt.xticks(rotation=45)
+
 plt.show()
 

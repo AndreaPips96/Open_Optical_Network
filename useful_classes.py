@@ -287,36 +287,71 @@ class Network:
         for connection in connections:
             if parameter == 'latency':
                 path, best_lat, channel = self.find_best_latency(connection.input, connection.output)
-                if path == '' and best_lat == 1000:
-                    connection.latency = 'None'
-                    connection.snr = 0
-                else:
-                    print(path, best_lat, channel)
-                    signal = LightPath(channel - 1, path)
-                    self.propagate(signal)
-                    connection.latency = signal.latency
-                    connection.snr = 10 * np.log10(signal.signal_power / signal.noise_power)
-                    self.update_route_space(path)
             elif parameter == 'snr':
                 path, best_snr, channel = self.find_best_snr(connection.input, connection.output)
-                if (path == '' and best_snr == 0) or channel == 0:
-                    connection.latency = 'None'
-                    connection.snr = 0
-                else:
-                    print(path, best_snr, channel, i)
-                    i = i+1
-                    signal = LightPath(channel - 1, path)
-                    self.propagate(signal)
-                    connection.latency = signal.latency
-                    connection.snr = 10 * np.log10(signal.signal_power / signal.noise_power)
-                    self.update_route_space(path)
             else:
                 raise NameError('Wrong parameter: nor \'latency\' nor \'snr\' inserted')
+            if path != '':
+                Rb = self.calculate_bit_rate(path, self.nodes[path[0]].transceiver)
+                connection.Rb = Rb
+                if Rb > 0:
+                    print(path, best_snr, channel, i)
+                    i = i + 1
+                    signal = LightPath(channel - 1, path)
+                    self.propagate(signal)
+                    if parameter == 'latency':
+                        connection.latency = best_lat
+                        connection.snr = 10 * np.log10(signal.signal_power / signal.noise_power)
+                    else:
+                        connection.latency = signal.latency
+                        # connection.snr = 10 * np.log10(signal.signal_power / signal.noise_power)
+                        connection.snr = best_snr
+                    self.update_route_space(path)
+                else:
+                    connection.latency = 'None'
+                    connection.snr = 0
+            else:
+                connection.latency = 'None'
+                connection.snr = 0
 
         for node in self.nodes:
             self.nodes[node].switching_matrix = dict(self.default_switching_matrices[node])
         # for line in self.lines:
         #     self.lines[line].state = np.array([free] * 10)
+
+        # for connection in connections:
+        #     if parameter == 'latency':
+        #         path, best_lat, channel = self.find_best_latency(connection.input, connection.output)
+        #         if path == '' and best_lat == 1000:
+        #             connection.latency = 'None'
+        #             connection.snr = 0
+        #         else:
+        #             print(path, best_lat, channel, i)
+        #             i = i + 1
+        #             signal = LightPath(channel - 1, path)
+        #             self.propagate(signal)
+        #             connection.latency = signal.latency
+        #             connection.snr = 10 * np.log10(signal.signal_power / signal.noise_power)
+        #             self.update_route_space(path)
+        #     elif parameter == 'snr':
+        #         path, best_snr, channel = self.find_best_snr(connection.input, connection.output)
+        #         if (path == '' and best_snr == 0) or channel == 0:
+        #             connection.latency = 'None'
+        #             connection.snr = 0
+        #         else:
+        #             print(path, best_snr, channel, i)
+        #             i = i+1
+        #             Rb = self.calculate_bit_rate(path, self.nodes[path[0]].transceiver)
+        #             connection.Rb = Rb
+        #             if Rb > 0:
+        #                 signal = LightPath(channel - 1, path)
+        #                 self.propagate(signal)
+        #                 connection.latency = signal.latency
+        #                 # connection.snr = 10 * np.log10(signal.signal_power / signal.noise_power)
+        #                 connection.snr = best_snr
+        #                 self.update_route_space(path)
+        #     else:
+        #         raise NameError('Wrong parameter: nor \'latency\' nor \'snr\' inserted')
 
     # LAB 5
     def probe(self, lightpath):
@@ -408,11 +443,12 @@ class Network:
 class Connection:
 
     def __init__(self, snode, dnode):
-        self.input = snode  # string
-        self.output = dnode  # string
-        self.signal_power = 1.0e-03  # float
-        self.latency = 0.0  # float
-        self.snr = 0.0  # float
+        self.input = snode              # string
+        self.output = dnode             # string
+        self.signal_power = 1.0e-03     # float
+        self.latency = 0.0              # float
+        self.snr = 0.0                  # float
+        self.Rb = 0.0                   # LAB 7 - float
 
 
 # LAB 5
