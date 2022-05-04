@@ -44,21 +44,28 @@ class Node:
             self.transceiver = 'fixed_rate'
 
     def propagate(self, lightpath):
-        # LAB 7
-        # set side channel occupancy
-        if len(lightpath.path) > 2:
-            if lightpath.channel+1 < 10:
-                self.successive[lightpath.path[:2]].successive[lightpath.path[1]].switching_matrix[lightpath.path[0]][
-                    lightpath.path[2]][lightpath.channel+1] = up.OCCUPIED
-            if lightpath.channel-1 >= 0:
-                self.successive[lightpath.path[:2]].successive[lightpath.path[1]].switching_matrix[lightpath.path[0]][
-                    lightpath.path[2]][lightpath.channel-1] = up.OCCUPIED
+        # LAB 9
+        # check for last node not reached
+        if len(lightpath.path) > 1:
+            # LAB 7
+            # set side channel occupancy
+            if len(lightpath.path) > 2:
+                if lightpath.channel+1 < 10:
+                    self.successive[lightpath.path[:2]].successive[lightpath.path[1]].switching_matrix[lightpath.path[0]][
+                        lightpath.path[2]][lightpath.channel+1] = up.OCCUPIED
+                if lightpath.channel-1 >= 0:
+                    self.successive[lightpath.path[:2]].successive[lightpath.path[1]].switching_matrix[lightpath.path[0]][
+                        lightpath.path[2]][lightpath.channel-1] = up.OCCUPIED
 
-        lightpath.update_path()
-        if lightpath.path != '':
+            next_line = self.successive[self.label + lightpath.path[1]]
+            lightpath.signal_power = next_line.optimized_launch_power()
+            lightpath.update_path()
             # call the successive element propagate method, accordingly to the specified path.
-            next_label = lightpath.path[0]
-            self.successive[self.label + next_label].propagate(lightpath)
+            self.successive[next_line.label].propagate(lightpath)
+            # if lightpath.path != '':
+            #     call the successive element propagate method, accordingly to the specified path.
+            #     next_label = lightpath.path[0]
+            #     self.successive[self.label + next_label].propagate(lightpath)
 
     # LAB 5
     def probe(self, lightpath):
@@ -78,24 +85,28 @@ class Line:
         self.state = np.array([up.FREE] * 10)  # string - LAB 4 - LAB 5 - LAB 6
         self.n_amplifiers = 1 + np.ceil(self.length/up.DIST_BTW_AMP)    # LAB 8
         self.n_span = self.n_amplifiers - 1
-        self.amp_gain = 10 ** (up.AMP_GAIN/10)    # linear units
-        self.amp_nf = 10 ** (up.AMP_NF/10)        # linear units
-        self.alpha = up.ALPHA_dB
+        self.amp_gain = up.db2lin(up.AMP_GAIN)    # linear units
+        self.amp_nf = up.db2lin(up.AMP_NF)        # linear units
+        self.alpha_db = up.ALPHA_dB
+        self.alpha_lin = up.alpha_db2lin(self.alpha_db) * 1e-3      # 1/m
         self.beta_2 = up.BETA_2
         self.gamma = up.GAMMA
 
     def latency_generation(self):
         return self.length / ((2 / 3) * up.c)
 
-    def noise_generation(self, signal_power):
-        return 1e-9 * signal_power * self.length
+    def noise_generation(self, lightpath):
+        # return 1e-9 * signal_power * self.length
+        # LAB 9
+        # print('ASE: '+str(self.ase_generation())+' NLI: '+str(self.nli_generation(lightpath)))  # debug & workflow print
+        return self.ase_generation() + self.nli_generation(lightpath)
 
     def propagate(self, lightpath):
         """
             Method to propagate a lightpath on all lines along a path
         """
         # Update power, noise and latency added by the line
-        lightpath.update_powlat(0, self.noise_generation(lightpath.signal_power), self.latency_generation())
+        lightpath.update_powlat(0, self.noise_generation(lightpath), self.latency_generation())
         # Set line status to occupied then propagate signal - LAB 4
         self.state[lightpath.channel] = up.OCCUPIED  # LAB 5
         next_label = lightpath.path[0]
@@ -107,7 +118,7 @@ class Line:
             Method to propagate a lightpath on all lines along a path without occupying them
         """
         # Update power, noise and latency added by the line
-        lightpath.update_powlat(0, self.noise_generation(lightpath.signal_power), self.latency_generation())
+        lightpath.update_powlat(0, self.noise_generation(lightpath), self.latency_generation())
         # Set next line
         next_label = lightpath.path[0]
         self.successive[next_label].probe(lightpath)
@@ -132,10 +143,18 @@ class Line:
         NLI = P * ch3 * η_nli * N_span
         :return: NLI in linear units
         """
-        eta_nli = (16 / (17*up.pi)) * \
-                  np.log(((up.pi**2) / 2) * (up.BETA_2 * (up.Rs**2) / up.alpha_db2lin(up.ALPHA_dB)) * (len(self.state)**(2*up.Rs / up.DELTA_F))) * \
-                  ((up.GAMMA**2) / (4*up.alpha_db2lin(up.ALPHA_dB)*up.BETA_2)) * (1/(up.Rs**3))
+        eta_nli = up.eta_nli_eval(self.alpha_lin, self.beta_2, self.gamma, len(self.state))
         return (lightpath.signal_power**3) * eta_nli * self.n_span
+
+    # LAB 9
+    def optimized_launch_power(self):
+        """
+        determination of the optimal launch power using Local Optimization Global Optimization (LOGO) strategy
+        :return: optimal launch power
+        """
+        P_ase = self.ase_generation()
+        eta_nli = up.eta_nli_eval(self.alpha_lin, self.beta_2, self.gamma, len(self.state))
+        return np.cbrt(P_ase / (2*up.Bn*eta_nli*self.n_span))
 
 
 class Network:
@@ -323,20 +342,24 @@ class Network:
             else:
                 raise NameError('Wrong parameter: nor \'latency\' nor \'snr\' inserted')
             if path != '':
-                bit_rate = self.calculate_bit_rate(path, self.nodes[path[0]].transceiver)
+                # LAB 9
+                signal = LightPath(channel - 1, path)
+                bit_rate = self.calculate_bit_rate(signal, self.nodes[path[0]].transceiver)
                 connection.bit_rate = bit_rate
                 if bit_rate > 0:
                     print(path, best_snr, channel, i)
                     i = i + 1
-                    signal = LightPath(channel - 1, path)
+                    # signal = LightPath(channel - 1, path)
                     self.propagate(signal)
                     if parameter == 'latency':
                         connection.latency = best_lat
-                        connection.snr = 10 * np.log10(signal.signal_power / signal.noise_power)
+                        # connection.snr = 10 * np.log10(signal.signal_power / signal.noise_power)
+                        connection.snr = up.lin2db(signal.signal_power / signal.noise_power)
                     else:
                         connection.latency = signal.latency
                         # connection.snr = 10 * np.log10(signal.signal_power / signal.noise_power)
-                        connection.snr = best_snr
+                        # connection.snr = best_snr
+                        connection.snr = up.lin2db(signal.signal_power / signal.noise_power)
                     self.update_route_space(path)
                 else:
                     connection.latency = 'None'
@@ -458,14 +481,17 @@ class Network:
                 switching_matrix[label1][label2] = np.array([up.FREE] * 10)
         return switching_matrix
 
-    # LAB 7
-    def calculate_bit_rate(self, path, strategy):
+    # LAB 7 - LAB 9
+    def calculate_bit_rate(self, lightpath, strategy):
         if strategy == 'fixed_rate':
-            bit_rate = up.fixed_bit_rate(self.weighted_paths.loc[path, 'SNR [dB]'])
+            bit_rate = up.fixed_bit_rate(up.db2lin(self.weighted_paths.loc[lightpath.path, 'SNR [dB]']),
+                                         lightpath.symbol_rate)
         elif strategy == 'flex_rate':
-            bit_rate = up.flex_bit_rate(self.weighted_paths.loc[path, 'SNR [dB]'])
+            bit_rate = up.flex_bit_rate(up.db2lin(self.weighted_paths.loc[lightpath.path, 'SNR [dB]']),
+                                        lightpath.symbol_rate)
         elif strategy == 'shannon':
-            bit_rate = up.shannon_bit_rate(self.weighted_paths.loc[path, 'SNR [dB]'])
+            bit_rate = up.shannon_bit_rate(up.db2lin(self.weighted_paths.loc[lightpath.path, 'SNR [dB]']),
+                                           lightpath.symbol_rate)
         else:
             raise NameError('Wrong strategy: nor \'fixed_rate\' nor \'flex_rate\' nor \'shannon\' inserted')
         return bit_rate
@@ -479,7 +505,7 @@ class Connection:
         self.signal_power = 1.0e-03     # float
         self.latency = 0.0              # float
         self.snr = 0.0                  # float
-        self.bit_rate = 0.0                   # LAB 7 - float
+        self.bit_rate = 0.0             # LAB 7 - float
 
 
 # LAB 5

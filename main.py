@@ -8,12 +8,13 @@ from useful_classes import Network
 from useful_classes import SignalInformation
 from useful_classes import Connection
 from useful_classes import LightPath
+from Lab07 import utils_and_param as up
 
 # Open and import JSON file
 # f = open('Lab03/nodes.json')
 # f = open('Lab07/nodes_full.json')
 # f = open('Lab07/nodes_not_full.json')
-f = open('Lab07/nodes_full_shannon.json')
+f = open('Lab07/nodes_full_flex_rate.json')
 nodes_dict = json.load(f)
 f.close()
 # print(nodes_dict)
@@ -46,7 +47,7 @@ for path in paths:
     network.probe(signal)
     latencies.append(signal.latency)
     noise.append(signal.noise_power)
-    snr.append(10*np.log10(signal.signal_power/signal.noise_power))
+    snr.append(up.lin2db(signal.signal_power/signal.noise_power))
 # Insert latency, noise power and SNR in network DataFrame
 network_df['Latency [s]'] = latencies
 network_df['Noise_power [W]'] = noise
@@ -83,25 +84,40 @@ for i in range(100):
     connection = Connection(source, destination)
     connections.append(connection)
 
-# network.stream(connections)
+# LAB 9
+for M in range(1, 2):
+    traffic_matrix = up.generate_traffic_matrix(pd.DataFrame(index=network.nodes.keys(), columns=network.nodes.keys()), M)
+
+
+# network.stream(connections, 'latency')
 # lat = [connection.latency for connection in connections if connection.latency != 'None']
 # plt.figure()
 # plt.hist(lat)                                           # MIGLIORARE PLOT
 # plt.title('Latency distribution')
 # plt.xticks(rotation=45)
 
-network.stream(connections, parameter='snr')
+network.stream(connections, 'snr')
 snr = [connection.snr for connection in connections if connection.snr != 0]
 plt.figure()
 plt.hist(snr)                                           # MIGLIORARE PLOT
 plt.title('SNR distribution')
 plt.xticks(rotation=45)
 
-bit_rates = [connection.Rb for connection in connections if connection.Rb != 0]
+bit_rates = [connection.bit_rate for connection in connections if connection.bit_rate != 0]
+print(len(bit_rates))
+avg_bit_rate = np.mean(bit_rates)
+print('Average deployed bit rate: ' + str(avg_bit_rate/1e9) + 'Gbps')
+tot_capacity = np.sum(bit_rates)
+print('Total deployed capacity: ' + str(tot_capacity/1e9) + 'Gbps')
 plt.figure()
 plt.hist(bit_rates)                                           # MIGLIORARE PLOT
 plt.title('Bit rate allocation distribution')
 plt.xticks(rotation=45)
 
 plt.show()
+
+# FORMULA P_opt DA MODIFICARE TOGLIENDO Bn
+# SCRIVERE FUNZIONE PER GESTIRE TRAFFIC MATRIX E CONNESSIONI
+# IMPOSTARE MONTE CARLO
+
 
