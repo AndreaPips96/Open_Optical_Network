@@ -5,6 +5,7 @@ import scipy.constants as sp_const
 # parameter definition
 FREE = 1
 OCCUPIED = 0
+Nch = 10
 
 BERt = 1e-3             # target Bit Error Rate
 Rs = 32 * 1e9           # Symbol rate - 32GHz
@@ -20,7 +21,7 @@ h_plank = sp_const.h    # Plank constant
 c = sp_const.c          # speed of light
 pi = sp_const.pi        # Greek pi
 
-DIST_BTW_AMP = 80e3     # Distance between amplifiers - 80e3m = 80km
+DIST_BTW_AMP = 80e3     # Distance between amplifiers - 80km
 AMP_GAIN = 16           # Amplifiers gain - 16dB
 AMP_NF = 3              # Amplifiers noise figure - 3dB
 
@@ -95,3 +96,15 @@ def generate_traffic_matrix(traffic_matrix, M):
                 traffic_matrix[node_in][node_out] = 0
     return traffic_matrix
 
+
+# Evaluate overall congestion percentage
+def congestion_eval(Network):
+    tot_perc = 0
+    for node in Network.nodes.keys():
+        for channels in Network.nodes[node].switching_matrix.values():
+            available_ch = np.sum(list(channels.values())) / Nch
+            tot_node_ch = len(list(channels.values()))**2
+            tot_perc += (available_ch/tot_node_ch)*100
+            break
+    tot_perc = tot_perc/len(Network.nodes.keys())
+    return tot_perc

@@ -1,4 +1,5 @@
 # USEFUL CLASSES
+import random
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -99,6 +100,7 @@ class Line:
         # return 1e-9 * signal_power * self.length
         # LAB 9
         # print('ASE: '+str(self.ase_generation())+' NLI: '+str(self.nli_generation(lightpath)))  # debug & workflow print
+        pnli = self.nli_generation(lightpath)       # DEBUG
         return self.ase_generation() + self.nli_generation(lightpath)
 
     def propagate(self, lightpath):
@@ -144,7 +146,7 @@ class Line:
         :return: NLI in linear units
         """
         eta_nli = up.eta_nli_eval(self.alpha_lin, self.beta_2, self.gamma, len(self.state))
-        return (lightpath.signal_power**3) * eta_nli * self.n_span
+        return (lightpath.signal_power**3) * eta_nli * self.n_span * up.Bn
 
     # LAB 9
     def optimized_launch_power(self):
@@ -154,7 +156,7 @@ class Line:
         """
         P_ase = self.ase_generation()
         eta_nli = up.eta_nli_eval(self.alpha_lin, self.beta_2, self.gamma, len(self.state))
-        return np.cbrt(P_ase / (2*up.Bn*eta_nli*self.n_span))
+        return np.cbrt(P_ase / (2*eta_nli*self.n_span*up.Bn))   # *Bn
 
 
 class Network:
@@ -275,7 +277,7 @@ class Network:
                 y1 = n1.position[1]
                 plt.plot([x0, x1], [y0, y1], 'b', zorder=0, linewidth=2)
         plt.title('Network topology')
-        fig.savefig('Network_topology.png')
+        # fig.savefig('Network_topology.png')
         plt.show()
 
     # LAB 4
@@ -332,44 +334,45 @@ class Network:
                         best_path = path
         return best_path, best_lat, ch
 
-    def stream(self, connections, parameter='latency'):
-        i = 1
-        for connection in connections:
-            if parameter == 'latency':
-                path, best_lat, channel = self.find_best_latency(connection.input, connection.output)
-            elif parameter == 'snr':
-                path, best_snr, channel = self.find_best_snr(connection.input, connection.output)
-            else:
-                raise NameError('Wrong parameter: nor \'latency\' nor \'snr\' inserted')
-            if path != '':
-                # LAB 9
-                signal = LightPath(channel - 1, path)
-                bit_rate = self.calculate_bit_rate(signal, self.nodes[path[0]].transceiver)
-                connection.bit_rate = bit_rate
-                if bit_rate > 0:
-                    print(path, best_snr, channel, i)
-                    i = i + 1
-                    # signal = LightPath(channel - 1, path)
-                    self.propagate(signal)
-                    if parameter == 'latency':
-                        connection.latency = best_lat
-                        # connection.snr = 10 * np.log10(signal.signal_power / signal.noise_power)
-                        connection.snr = up.lin2db(signal.signal_power / signal.noise_power)
-                    else:
-                        connection.latency = signal.latency
-                        # connection.snr = 10 * np.log10(signal.signal_power / signal.noise_power)
-                        # connection.snr = best_snr
-                        connection.snr = up.lin2db(signal.signal_power / signal.noise_power)
-                    self.update_route_space(path)
+    def stream(self, connection, parameter='latency'):
+        # i = 1
+        # for connection in connections:
+        if parameter == 'latency':
+            path, best_lat, channel = self.find_best_latency(connection.input, connection.output)
+        elif parameter == 'snr':
+            path, best_snr, channel = self.find_best_snr(connection.input, connection.output)
+        else:
+            raise NameError('Wrong parameter: nor \'latency\' nor \'snr\' inserted')
+        if path != '':
+            # LAB 9
+            signal = LightPath(channel - 1, path)
+            bit_rate = self.calculate_bit_rate(signal, self.nodes[path[0]].transceiver)
+            connection.bit_rate = bit_rate
+            if bit_rate > 0:
+                print(path, channel)
+                # i = i + 1
+                # signal = LightPath(channel - 1, path)
+                self.propagate(signal)
+                if parameter == 'latency':
+                    connection.latency = best_lat
+                    # connection.snr = 10 * np.log10(signal.signal_power / signal.noise_power)
+                    connection.snr = up.lin2db(signal.signal_power / signal.noise_power)
                 else:
-                    connection.latency = 'None'
-                    connection.snr = 0
+                    connection.latency = signal.latency
+                    # connection.snr = 10 * np.log10(signal.signal_power / signal.noise_power)
+                    # connection.snr = best_snr
+                    connection.snr = up.lin2db(signal.signal_power / signal.noise_power)
+                    connection.signal_power = signal.signal_power
+                self.update_route_space(path)
             else:
                 connection.latency = 'None'
                 connection.snr = 0
+        else:
+            connection.latency = 'None'
+            connection.snr = 0
 
-        for node in self.nodes:
-            self.nodes[node].switching_matrix = dict(self.default_switching_matrices[node])
+        # for node in self.nodes:
+        #     self.nodes[node].switching_matrix = dict(self.default_switching_matrices[node])
         # for line in self.lines:
         #     self.lines[line].state = np.array([FREE] * 10)
 
@@ -410,8 +413,7 @@ class Network:
     # LAB 5
     def probe(self, lightpath):
         """
-            This function has to propagate the lightpath information through the path specified in it
-            and returns the modified spectral information.
+            This function propagates the lightpath information through the path specified in it.
         """
         node = self.nodes[lightpath.path[0]]
         node.probe(lightpath)
@@ -476,9 +478,9 @@ class Network:
             # if label1 == label2:
             # LAB7
             if 0 in my_dict[node]['switching_matrix'][label1][label2]:
-                switching_matrix[label1][label2] = np.array([up.OCCUPIED] * 10)
+                switching_matrix[label1][label2] = np.array([up.OCCUPIED] * up.Nch)
             else:
-                switching_matrix[label1][label2] = np.array([up.FREE] * 10)
+                switching_matrix[label1][label2] = np.array([up.FREE] * up.Nch)
         return switching_matrix
 
     # LAB 7 - LAB 9
@@ -495,6 +497,54 @@ class Network:
         else:
             raise NameError('Wrong strategy: nor \'fixed_rate\' nor \'flex_rate\' nor \'shannon\' inserted')
         return bit_rate
+
+    # LAB 9
+    def manage_traffic_matrix(self, traffic_matrix):
+        MAX_REJ = 15
+        rejection_consecutive_cnt = 0
+        congestion_percentage = 0.0
+        connections = []
+        non_zero_request = []
+        # In order to track easily if traffic matrix is null save all possible in-out nodes and delete them when traffic
+        # matrix gets to 0 for that in-out couple
+        for source in self.nodes.keys():
+            for destination in self.nodes.keys():
+                if source != destination:
+                    non_zero_request.append(source + destination)
+        # Create new connections until either the traffic matrix is null, the network is saturated or too many
+        # consecutive blocking events
+        # while not congested and not null matrix:
+        while (int(congestion_percentage) < 95) and non_zero_request and rejection_consecutive_cnt <= MAX_REJ:
+            # Choose a new random connection among available ones
+            nodes = random.choice(non_zero_request)
+            source = nodes[0]
+            destination = nodes[1]
+
+            # Make new connection
+            connection = Connection(source, destination)
+            # Add the new connection to the list collecting all connections
+            connections.append(connection)
+            # Stream new connection
+            self.stream(connection)
+
+            # If connection wasn't rejected update traffic matrix and congestion
+            if connection.snr != 0 and connection.latency != 'None':
+                rejection_consecutive_cnt = 0
+                if traffic_matrix[source][destination] - connection.bit_rate > 0:
+                    traffic_matrix[source][destination] -= connection.bit_rate
+                elif traffic_matrix[source][destination] - connection.bit_rate == 0:
+                    traffic_matrix[source][destination] -= connection.bit_rate
+                    non_zero_request.remove(nodes)
+                else:
+                    connection.bit_rate = traffic_matrix[source][destination]
+                    traffic_matrix[source][destination] = 0
+                    non_zero_request.remove(nodes)
+                congestion_percentage = up.congestion_eval(self)
+            # If connection was rejected count consecutive rejections: if more than X consecutive means that network is
+            # somehow unable to accept more connections
+            else:
+                rejection_consecutive_cnt += 1
+        return connections
 
 
 class Connection:

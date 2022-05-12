@@ -14,7 +14,9 @@ from Lab07 import utils_and_param as up
 # f = open('Lab03/nodes.json')
 # f = open('Lab07/nodes_full.json')
 # f = open('Lab07/nodes_not_full.json')
-f = open('Lab07/nodes_full_flex_rate.json')
+f = open('Lab07/nodes_full_fixed_rate.json')
+# f = open('Lab07/nodes_full_flex_rate.json')
+# f = open('Lab07/nodes_full_shannon.json')
 nodes_dict = json.load(f)
 f.close()
 # print(nodes_dict)
@@ -85,9 +87,12 @@ for i in range(100):
     connections.append(connection)
 
 # LAB 9
-for M in range(1, 2):
-    traffic_matrix = up.generate_traffic_matrix(pd.DataFrame(index=network.nodes.keys(), columns=network.nodes.keys()), M)
-
+for M in range(1, 3):
+    # Generate uniform traffic matrix with M*100Gbps capacity per line
+    traffic_matrix = up.generate_traffic_matrix(pd.DataFrame(index=network.nodes.keys(), columns=network.nodes.keys()),
+                                                M)
+    # Generate connections and stream them
+    connections = network.manage_traffic_matrix(traffic_matrix)
 
 # network.stream(connections, 'latency')
 # lat = [connection.latency for connection in connections if connection.latency != 'None']
@@ -96,12 +101,12 @@ for M in range(1, 2):
 # plt.title('Latency distribution')
 # plt.xticks(rotation=45)
 
-network.stream(connections, 'snr')
-snr = [connection.snr for connection in connections if connection.snr != 0]
-plt.figure()
-plt.hist(snr)                                           # MIGLIORARE PLOT
-plt.title('SNR distribution')
-plt.xticks(rotation=45)
+# network.stream(connections, 'snr')
+    snr = [connection.snr for connection in connections if connection.snr != 0]
+    plt.figure()
+    plt.hist(snr)                                           # MIGLIORARE PLOT
+    plt.title('SNR distribution')
+    plt.xticks(rotation=45)
 
 bit_rates = [connection.bit_rate for connection in connections if connection.bit_rate != 0]
 print(len(bit_rates))
@@ -116,8 +121,9 @@ plt.xticks(rotation=45)
 
 plt.show()
 
-# FORMULA P_opt DA MODIFICARE TOGLIENDO Bn
+# FORMULA P_opt DA MODIFICARE TOGLIENDO Bn? - V
 # SCRIVERE FUNZIONE PER GESTIRE TRAFFIC MATRIX E CONNESSIONI
 # IMPOSTARE MONTE CARLO
+# number of 0s in switching matrix divided by Nch X100 is the congestion percentage
 
 
