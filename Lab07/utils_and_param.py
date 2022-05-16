@@ -100,11 +100,30 @@ def generate_traffic_matrix(traffic_matrix, M):
 # Evaluate overall congestion percentage
 def congestion_eval(Network):
     tot_perc = 0
-    for node in Network.nodes.keys():
-        for channels in Network.nodes[node].switching_matrix.values():
-            available_ch = np.sum(list(channels.values())) / Nch
-            tot_node_ch = len(list(channels.values()))**2
-            tot_perc += (available_ch/tot_node_ch)*100
-            break
-    tot_perc = tot_perc/len(Network.nodes.keys())
+    unavailable_ch = 0
+    available_ch = 0
+    tot_ch = len(Network.lines.keys()) * Nch
+    for line in range(len(Network.route_space.columns)):
+        col = Network.route_space.iloc[:, line]
+        unavailable_ch += np.count_nonzero(col.loc[col.first_valid_index()] == OCCUPIED)
+        available_ch += np.sum(col.loc[col.first_valid_index()])
+    print(unavailable_ch, available_ch)
+    tot_perc = unavailable_ch * 100 / tot_ch
     return tot_perc
+    # for line in Network.lines.keys():
+    #     # for state in Network.lines[line].state:
+    #     unavailable_ch += np.count_nonzero(Network.lines[line].state == OCCUPIED)
+    #     available_ch += np.sum(Network.lines[line].state)
+    #     # print(Network.lines[line].state)
+    # print(unavailable_ch, available_ch)
+    # tot_perc = unavailable_ch * 100 / tot_ch
+    # return tot_perc
+
+    # for node in Network.nodes.keys():
+    #     for channels in Network.nodes[node].switching_matrix.values():
+    #         available_ch = np.sum(list(channels.values())) / Nch
+    #         tot_node_ch = len(list(channels.values()))**2
+    #         tot_perc += (available_ch/tot_node_ch)*100
+    #         break
+    # tot_perc = tot_perc/len(Network.nodes.keys())
+    # return tot_perc

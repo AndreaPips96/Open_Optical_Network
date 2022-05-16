@@ -70,11 +70,18 @@ class Node:
 
     # LAB 5
     def probe(self, lightpath):
-        lightpath.update_path()
-        if lightpath.path != '':
-            # call the successive element probe method, accordingly to the specified path.
-            next_label = lightpath.path[0]
-            self.successive[self.label + next_label].probe(lightpath)
+        if len(lightpath.path) > 1:
+            next_line = self.successive[self.label + lightpath.path[1]]
+            lightpath.signal_power = next_line.optimized_launch_power()
+            lightpath.update_path()
+            # call the successive element propagate method, accordingly to the specified path.
+            self.successive[next_line.label].probe(lightpath)
+
+        # lightpath.update_path()
+        # if lightpath.path != '':
+        #     # call the successive element probe method, accordingly to the specified path.
+        #     next_label = lightpath.path[0]
+        #     self.successive[self.label + next_label].probe(lightpath)
 
 
 class Line:
@@ -438,9 +445,11 @@ class Network:
         #             #                                     self.nodes[i].switching_matrix[line[0]][line[1]]    # LAB 6
         #     line = i
         if len(path) < 3:
+            line = path
             for route in self.route_space.index:
-                if path in route:
-                    self.route_space.loc[route][path] = deepcopy(self.lines[path].state)
+                if line in route:
+                    self.route_space.loc[route][line] = np.multiply(self.route_space.loc[route][line],
+                                                                    self.lines[line].state)
         else:
             for i in list(range(1, len(path)-1)):
                 for j in range(2):
@@ -514,7 +523,7 @@ class Network:
         # Create new connections until either the traffic matrix is null, the network is saturated or too many
         # consecutive blocking events
         # while not congested and not null matrix:
-        while (int(congestion_percentage) < 95) and non_zero_request and rejection_consecutive_cnt <= MAX_REJ:
+        while (int(congestion_percentage) < 99) and non_zero_request and rejection_consecutive_cnt <= MAX_REJ:
             # Choose a new random connection among available ones
             nodes = random.choice(non_zero_request)
             source = nodes[0]
@@ -529,7 +538,9 @@ class Network:
 
             # If connection wasn't rejected update traffic matrix and congestion
             if connection.snr != 0 and connection.latency != 'None':
-                rejection_consecutive_cnt = 0
+                if rejection_consecutive_cnt != 0:
+                    print(rejection_consecutive_cnt)
+                    rejection_consecutive_cnt = 0
                 if traffic_matrix[source][destination] - connection.bit_rate > 0:
                     traffic_matrix[source][destination] -= connection.bit_rate
                 elif traffic_matrix[source][destination] - connection.bit_rate == 0:
@@ -540,11 +551,21 @@ class Network:
                     traffic_matrix[source][destination] = 0
                     non_zero_request.remove(nodes)
                 congestion_percentage = up.congestion_eval(self)
+                print(congestion_percentage)
             # If connection was rejected count consecutive rejections: if more than X consecutive means that network is
             # somehow unable to accept more connections
             else:
                 rejection_consecutive_cnt += 1
-        return connections
+        print(f'{congestion_percentage}%', ' '+str(rejection_consecutive_cnt)+' ', non_zero_request)
+
+        # Reset network for future experiments
+        for node in self.nodes:
+            self.nodes[node].switching_matrix = dict(self.default_switching_matrices[node])
+        for line in self.lines:
+            self.lines[line].state = np.array([up.FREE] * 10)
+        self.build_route_space()
+
+        return connections, congestion_percentage
 
 
 class Connection:

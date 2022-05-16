@@ -87,12 +87,29 @@ for i in range(100):
     connections.append(connection)
 
 # LAB 9
-for M in range(1, 3):
+tot_snr = []
+tot_accepted_Rb = []
+tot_avg_Rb = []
+tot_capacity_deployed = []
+tot_congestion = []
+tot_connections = []
+tot_perc_allocations = []
+for M in range(1, up.M_max):
     # Generate uniform traffic matrix with M*100Gbps capacity per line
-    traffic_matrix = up.generate_traffic_matrix(pd.DataFrame(index=network.nodes.keys(), columns=network.nodes.keys()),
+    traffic_matrix = up.generate_traffic_matrix(pd.DataFrame(index=network.nodes.keys(),
+                                                             columns=network.nodes.keys()),
                                                 M)
     # Generate connections and stream them
-    connections = network.manage_traffic_matrix(traffic_matrix)
+    connections, congestion = network.manage_traffic_matrix(traffic_matrix)
+    # Save parameters for future analysis
+    tot_snr.append([connection.snr for connection in connections if connection.snr != 0])
+    tot_accepted_Rb.append([connection.bit_rate for connection in connections if connection.bit_rate != 0])
+    tot_avg_Rb.append(sum(tot_accepted_Rb[M-1]) / (len(tot_accepted_Rb[M-1]) * 1e9))
+    tot_capacity_deployed.append(sum(tot_accepted_Rb[M-1]) / 1e9)
+    tot_congestion.append(congestion)
+    tot_connections.append(len(tot_accepted_Rb[M-1]))
+    tot_perc_allocations.append(len(tot_accepted_Rb[M-1]) / len(connections) * 100)
+
 
 # network.stream(connections, 'latency')
 # lat = [connection.latency for connection in connections if connection.latency != 'None']
@@ -102,11 +119,11 @@ for M in range(1, 3):
 # plt.xticks(rotation=45)
 
 # network.stream(connections, 'snr')
-    snr = [connection.snr for connection in connections if connection.snr != 0]
-    plt.figure()
-    plt.hist(snr)                                           # MIGLIORARE PLOT
-    plt.title('SNR distribution')
-    plt.xticks(rotation=45)
+# snr = [connection.snr for connection in connections if connection.snr != 0]
+plt.figure()
+plt.hist(snr)                                           # MIGLIORARE PLOT
+plt.title('SNR distribution')
+plt.xticks(rotation=45)
 
 bit_rates = [connection.bit_rate for connection in connections if connection.bit_rate != 0]
 print(len(bit_rates))
