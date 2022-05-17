@@ -25,7 +25,7 @@ DIST_BTW_AMP = 80e3     # Distance between amplifiers - 80km
 AMP_GAIN = 16           # Amplifiers gain - 16dB
 AMP_NF = 3              # Amplifiers noise figure - 3dB
 
-M_max = 10              # number of Monte Carlo simulations
+M_max = 15
 
 
 # method for fixed-rate transceivers' bit rate evaluation
@@ -107,7 +107,7 @@ def congestion_eval(Network):
         col = Network.route_space.iloc[:, line]
         unavailable_ch += np.count_nonzero(col.loc[col.first_valid_index()] == OCCUPIED)
         available_ch += np.sum(col.loc[col.first_valid_index()])
-    print(unavailable_ch, available_ch)
+    # print(unavailable_ch, available_ch)
     tot_perc = unavailable_ch * 100 / tot_ch
     return tot_perc
     # for line in Network.lines.keys():

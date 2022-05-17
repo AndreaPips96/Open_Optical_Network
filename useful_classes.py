@@ -539,7 +539,7 @@ class Network:
             # If connection wasn't rejected update traffic matrix and congestion
             if connection.snr != 0 and connection.latency != 'None':
                 if rejection_consecutive_cnt != 0:
-                    print(rejection_consecutive_cnt)
+                    # print(rejection_consecutive_cnt)
                     rejection_consecutive_cnt = 0
                 if traffic_matrix[source][destination] - connection.bit_rate > 0:
                     traffic_matrix[source][destination] -= connection.bit_rate

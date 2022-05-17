@@ -4,6 +4,7 @@ import random
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.ticker import StrMethodFormatter
 from useful_classes import Network
 from useful_classes import SignalInformation
 from useful_classes import Connection
@@ -14,9 +15,9 @@ from Lab07 import utils_and_param as up
 # f = open('Lab03/nodes.json')
 # f = open('Lab07/nodes_full.json')
 # f = open('Lab07/nodes_not_full.json')
-f = open('Lab07/nodes_full_fixed_rate.json')
+# f = open('Lab07/nodes_full_fixed_rate.json')
 # f = open('Lab07/nodes_full_flex_rate.json')
-# f = open('Lab07/nodes_full_shannon.json')
+f = open('Lab07/nodes_full_shannon.json')
 nodes_dict = json.load(f)
 f.close()
 # print(nodes_dict)
@@ -94,7 +95,8 @@ tot_capacity_deployed = []
 tot_congestion = []
 tot_connections = []
 tot_perc_allocations = []
-for M in range(1, up.M_max):
+legend_param = []
+for M in range(1, up.M_max+1):
     # Generate uniform traffic matrix with M*100Gbps capacity per line
     traffic_matrix = up.generate_traffic_matrix(pd.DataFrame(index=network.nodes.keys(),
                                                              columns=network.nodes.keys()),
@@ -103,12 +105,13 @@ for M in range(1, up.M_max):
     connections, congestion = network.manage_traffic_matrix(traffic_matrix)
     # Save parameters for future analysis
     tot_snr.append([connection.snr for connection in connections if connection.snr != 0])
-    tot_accepted_Rb.append([connection.bit_rate for connection in connections if connection.bit_rate != 0])
-    tot_avg_Rb.append(sum(tot_accepted_Rb[M-1]) / (len(tot_accepted_Rb[M-1]) * 1e9))
-    tot_capacity_deployed.append(sum(tot_accepted_Rb[M-1]) / 1e9)
+    tot_accepted_Rb.append([connection.bit_rate / 1e9 for connection in connections if connection.bit_rate != 0])
+    tot_avg_Rb.append(sum(tot_accepted_Rb[M-1]) / len(tot_accepted_Rb[M-1]))
+    tot_capacity_deployed.append(sum(tot_accepted_Rb[M-1]))
     tot_congestion.append(congestion)
     tot_connections.append(len(tot_accepted_Rb[M-1]))
     tot_perc_allocations.append(len(tot_accepted_Rb[M-1]) / len(connections) * 100)
+    legend_param.append(str(M*100)+'Gbps requests')
 
 
 # network.stream(connections, 'latency')
@@ -121,9 +124,59 @@ for M in range(1, up.M_max):
 # network.stream(connections, 'snr')
 # snr = [connection.snr for connection in connections if connection.snr != 0]
 plt.figure()
-plt.hist(snr)                                           # MIGLIORARE PLOT
-plt.title('SNR distribution')
-plt.xticks(rotation=45)
+plt.title('GSNR distribution')
+hist, bins, x = plt.hist(tot_snr, align='mid', bins=20)                                           # MIGLIORARE PLOT
+ticks = [(bins[edge] + bins[edge+1])/2 for edge in range(len(bins)-1)]
+plt.xticks(ticks, rotation=45)
+plt.gca().set_xlabel('GSNR(dB)')
+plt.gca().set_ylabel('Number of connections')
+plt.gca().xaxis.set_major_formatter(StrMethodFormatter('{x:,.2f}'))
+plt.grid(color='gray', which='major', axis='y', linestyle='--')
+plt.gca().set_axisbelow(True)
+plt.legend(legend_param)
+
+plt.figure()
+plt.title('Accepted connections Rb')
+if network.nodes['A'].transceiver == 'flex_rate':
+    hist1, bins1, x = plt.hist(tot_accepted_Rb, align='mid', bins=4)
+    # plt.xticks(np.arange(125, 400, step=75), [100, 200, 300, 400], rotation=45)
+    ticks1 = [(bins1[edge] + bins1[edge + 1]) / 2 for edge in range(len(bins1) - 1)]
+    plt.xticks(ticks1, [100, 200, 300, 400], rotation=45)
+else:
+    hist1, bins1, x = plt.hist(tot_accepted_Rb, align='mid')
+    ticks1 = [(bins1[edge] + bins1[edge+1])/2 for edge in range(len(bins1)-1)]
+    plt.xticks(ticks1, rotation=45)
+plt.gca().set_xlabel('Rb(Gbps)')
+plt.gca().set_ylabel('Number of connections')
+plt.grid(color='gray', which='major', axis='y', linestyle='--')
+plt.gca().set_axisbelow(True)
+plt.legend(legend_param)
+
+plt.figure()
+plt.title('Average Rb(M)')
+plt.plot(range(1, up.M_max+1), tot_avg_Rb)
+plt.gca().set_xlabel('M')
+plt.gca().set_ylabel('Rb(Gbps)')
+plt.xticks(range(1, up.M_max+1))
+plt.grid(color='gray', which='major', linestyle='--')
+plt.gca().set_axisbelow(True)
+
+fig, ax1 = plt.subplots()
+ax2 = ax1.twinx()
+plt.title('Total capacity deployed')
+l1, = ax1.plot(range(1, up.M_max+1), tot_capacity_deployed, 'b-', label='Capacity')
+l2, = ax2.plot(range(1, up.M_max+1), tot_congestion, 'r-', label='Congestion')
+plt.gca().set_xlabel('M')
+ax1.set_ylabel('C(Gbps)')
+ax2.set_ylabel('Network final congestion (%)')
+plt.grid(color='gray', which='major', linestyle='--')
+plt.gca().set_axisbelow(True)
+p = [l1, l2]
+ax1.legend(p, [p_.get_label() for p_ in p])
+
+plt.show()
+print()
+exit()
 
 bit_rates = [connection.bit_rate for connection in connections if connection.bit_rate != 0]
 print(len(bit_rates))
