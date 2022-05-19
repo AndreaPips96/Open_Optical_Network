@@ -1,4 +1,5 @@
 # USEFUL CLASSES
+import logging
 import random
 import numpy as np
 import matplotlib.pyplot as plt
@@ -6,6 +7,7 @@ import pandas as pd
 from copy import deepcopy
 from Lab07 import utils_and_param as up
 
+logging.basicConfig(filename='network.txt', level=logging.INFO, filemode='w')
 # free = 1
 # occupied = 0
 
@@ -52,11 +54,13 @@ class Node:
             # set side channel occupancy
             if len(lightpath.path) > 2:
                 if lightpath.channel+1 < 10:
-                    self.successive[lightpath.path[:2]].successive[lightpath.path[1]].switching_matrix[lightpath.path[0]][
-                        lightpath.path[2]][lightpath.channel+1] = up.OCCUPIED
+                    self.successive[lightpath.path[:2]].successive[lightpath.path[1]] \
+                        .switching_matrix[lightpath.path[0]][lightpath.path[2]][lightpath.channel+1] = up.OCCUPIED
                 if lightpath.channel-1 >= 0:
-                    self.successive[lightpath.path[:2]].successive[lightpath.path[1]].switching_matrix[lightpath.path[0]][
-                        lightpath.path[2]][lightpath.channel-1] = up.OCCUPIED
+                    self.successive[lightpath.path[:2]].successive[lightpath.path[1]] \
+                        .switching_matrix[lightpath.path[0]][lightpath.path[2]][lightpath.channel-1] = up.OCCUPIED
+                self.successive[lightpath.path[:2]].successive[lightpath.path[1]] \
+                    .switching_matrix[lightpath.path[0]][lightpath.path[2]][lightpath.channel] = up.OCCUPIED
 
             next_line = self.successive[self.label + lightpath.path[1]]
             lightpath.signal_power = next_line.optimized_launch_power()
@@ -174,6 +178,7 @@ class Network:
         self.weighted_paths = pd.DataFrame()
         self.route_space = pd.DataFrame()
         self.default_switching_matrices = {}
+        self.cnt = 0
 
         for key in my_dict:
             self.nodes[key] = Node(key, my_dict[key])
@@ -352,11 +357,14 @@ class Network:
             raise NameError('Wrong parameter: nor \'latency\' nor \'snr\' inserted')
         if path != '':
             # LAB 9
+            if len(path) > 2:
+                self.cnt += 1
+            print(path)
             signal = LightPath(channel - 1, path)
             bit_rate = self.calculate_bit_rate(signal, self.nodes[path[0]].transceiver)
             connection.bit_rate = bit_rate
             if bit_rate > 0:
-                print(path, channel)
+                # print(path, channel)
                 # i = i + 1
                 # signal = LightPath(channel - 1, path)
                 self.propagate(signal)
@@ -364,6 +372,7 @@ class Network:
                     connection.latency = best_lat
                     # connection.snr = 10 * np.log10(signal.signal_power / signal.noise_power)
                     connection.snr = up.lin2db(signal.signal_power / signal.noise_power)
+                    connection.signal_power = signal.signal_power
                 else:
                     connection.latency = signal.latency
                     # connection.snr = 10 * np.log10(signal.signal_power / signal.noise_power)
@@ -460,7 +469,8 @@ class Network:
                             # LAB 6
                             self.route_space.loc[route][line] = \
                                 np.multiply(self.lines[line].state,
-                                            self.nodes[path[i]].switching_matrix[path[i-1]][path[i+1]])
+                                            self.nodes[path[i]].switching_matrix[path[i-1]][path[i+1]],
+                                            self.route_space.loc[route][line])
 
     def find_ch(self, path):
         row = self.route_space.loc[[path]]
@@ -509,7 +519,14 @@ class Network:
 
     # LAB 9
     def manage_traffic_matrix(self, traffic_matrix):
-        MAX_REJ = 15
+        self.cnt = 0
+        if self.nodes[list(self.nodes.keys())[0]].transceiver == 'fixed_rate':
+            MAX_REJ = 15
+        elif self.nodes[list(self.nodes.keys())[0]].transceiver == 'flex_rate':
+            MAX_REJ = 20
+        else:
+            MAX_REJ = 25
+
         rejection_consecutive_cnt = 0
         congestion_percentage = 0.0
         connections = []
@@ -523,7 +540,7 @@ class Network:
         # Create new connections until either the traffic matrix is null, the network is saturated or too many
         # consecutive blocking events
         # while not congested and not null matrix:
-        while (int(congestion_percentage) < 99) and non_zero_request and rejection_consecutive_cnt <= MAX_REJ:
+        while (int(congestion_percentage) < 100) and non_zero_request and rejection_consecutive_cnt <= MAX_REJ:
             # Choose a new random connection among available ones
             nodes = random.choice(non_zero_request)
             source = nodes[0]
@@ -551,16 +568,26 @@ class Network:
                     traffic_matrix[source][destination] = 0
                     non_zero_request.remove(nodes)
                 congestion_percentage = up.congestion_eval(self)
-                print(congestion_percentage)
+                # print(congestion_percentage)
             # If connection was rejected count consecutive rejections: if more than X consecutive means that network is
             # somehow unable to accept more connections
             else:
                 rejection_consecutive_cnt += 1
-        print(f'{congestion_percentage}%', ' '+str(rejection_consecutive_cnt)+' ', non_zero_request)
+
+        info = str(congestion_percentage) + ' [' + ''.join(x for x in non_zero_request) + ']'
+        unavailable_ch = 0
+        available_ch = 0
+        for line in self.lines.keys():
+            unavailable_ch += np.count_nonzero(self.lines[line].state == up.OCCUPIED)
+            available_ch += np.sum(self.lines[line].state)
+        lines = '0s:' + str(unavailable_ch) + ' ' + '1s:' + str(available_ch) + ' - Paths>2: ' + str(self.cnt)
+        logging.info(info)
+        logging.info(lines)
+        print(f'{congestion_percentage}%')
 
         # Reset network for future experiments
         for node in self.nodes:
-            self.nodes[node].switching_matrix = dict(self.default_switching_matrices[node])
+            self.nodes[node].switching_matrix = deepcopy(dict(self.default_switching_matrices[node]))
         for line in self.lines:
             self.lines[line].state = np.array([up.FREE] * 10)
         self.build_route_space()
