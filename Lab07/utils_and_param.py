@@ -25,8 +25,8 @@ DIST_BTW_AMP = 80e3     # Distance between amplifiers - 80km
 AMP_GAIN = 16           # Amplifiers gain - 16dB
 AMP_NF = 3              # Amplifiers noise figure - 3dB
 
-M_max = 10              # number of increasing M runs for Monte Carlo analysis
-MC = 30                 # number of Monte Carlo analysis for fixed M
+M_max = 30              # number of increasing M runs for Monte Carlo analysis
+MC = 20                 # number of Monte Carlo analysis for fixed M
 
 
 # method for fixed-rate transceivers' bit rate evaluation

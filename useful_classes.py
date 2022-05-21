@@ -359,7 +359,7 @@ class Network:
             # LAB 9
             if len(path) > 2:
                 self.cnt += 1
-            print(path)
+            # print(path)
             signal = LightPath(channel - 1, path)
             bit_rate = self.calculate_bit_rate(signal, self.nodes[path[0]].transceiver)
             connection.bit_rate = bit_rate
@@ -583,7 +583,7 @@ class Network:
         lines = '0s:' + str(unavailable_ch) + ' ' + '1s:' + str(available_ch) + ' - Paths>2: ' + str(self.cnt)
         logging.info(info)
         logging.info(lines)
-        print(f'{congestion_percentage}%')
+        # print(f'{congestion_percentage}%')
 
         # Reset network for future experiments
         for node in self.nodes:

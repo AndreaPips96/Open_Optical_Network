@@ -14,8 +14,8 @@ from Lab07 import utils_and_param as up
 # f = open('Lab03/nodes.json')
 # f = open('Lab07/nodes_full.json')
 # f = open('Lab07/nodes_not_full.json')
-f = open('Lab07/nodes_full_fixed_rate.json')
-# f = open('Lab07/nodes_full_flex_rate.json')
+# f = open('Lab07/nodes_full_fixed_rate.json')
+f = open('Lab07/nodes_full_flex_rate.json')
 # f = open('Lab07/nodes_full_shannon.json')
 nodes_dict = json.load(f)
 f.close()
@@ -109,6 +109,8 @@ if simulation_type == 'network congestion':
                                                     M)
         # Generate connections and stream them
         connections, congestion = network.manage_traffic_matrix(traffic_matrix)
+        # Show progresses
+        print('Run '+str(M), f': {congestion}%')
         # Save parameters for future analysis
         tot_snr.append([connection.snr for connection in connections if connection.snr != 0])
         tot_avg_snr.append(sum(tot_snr[M-1]) / len(tot_snr[M-1]))
@@ -124,7 +126,7 @@ if simulation_type == 'network congestion':
     # Plot results
     plt.figure(figsize=(9, 7), dpi=100)
     plt.title('GSNR distribution')
-    hist, bins, x = plt.hist(tot_snr, align='mid', bins=20)  # MIGLIORARE PLOT
+    hist, bins, x = plt.hist(tot_snr, align='mid', bins=20)
     ticks = [(bins[edge] + bins[edge + 1]) / 2 for edge in range(len(bins) - 1)]
     plt.xticks(ticks, rotation=45)
     plt.gca().set_xlabel('GSNR(dB)')
@@ -138,7 +140,6 @@ if simulation_type == 'network congestion':
     plt.title('Accepted connections Rb')
     if network.nodes['A'].transceiver == 'flex_rate':
         hist1, bins1, x = plt.hist(tot_accepted_Rb, align='mid', bins=4)
-        # plt.xticks(np.arange(125, 400, step=75), [100, 200, 300, 400], rotation=45)
         ticks1 = [(bins1[edge] + bins1[edge + 1]) / 2 for edge in range(len(bins1) - 1)]
         plt.xticks(ticks1, [100, 200, 300, 400])
     else:
@@ -153,14 +154,14 @@ if simulation_type == 'network congestion':
 
     fig1, ax1_1 = plt.subplots(figsize=(9, 7), dpi=100)
     ax2_1 = ax1_1.twinx()
-    plt.title('Average Rb(M) and GSNR(M)')
-    line1, = ax1_1.plot(range(1, up.M_max + 1), tot_avg_Rb, 'b-', label='Average deployed Rb per-line')
-    line2, = ax2_1.plot(range(1, up.M_max + 1), tot_avg_snr, 'r-', label='Average per-line GSNR')
+    plt.title('Average Rb(M) and GSNR(M) per-line')
+    line1, = ax1_1.plot(range(1, up.M_max + 1), tot_avg_Rb, 'b-', label='Rb')
+    line2, = ax2_1.plot(range(1, up.M_max + 1), tot_avg_snr, 'r-', label='GSNR')
     ax1_1.set_xlabel('M')
     ax1_1.set_ylabel('Rb(Gbps)')
     ax2_1.set_ylabel('GSNR(dB)')
-    secay = ax2_1.secondary_yaxis('right')
-    secay.set_yticks(np.linspace(25.5, 26.5, 10))
+    # secay = ax2_1.secondary_yaxis('right')
+    # secay.set_yticks(np.linspace(25.5, 26.5, 10))
     plt.xticks(range(1, up.M_max + 1))
     # ax1_1.grid(color='gray', which='major', linestyle='--')
     # ax2_1.grid(color='gray', which='major', axis='y', linestyle=':')
@@ -170,14 +171,14 @@ if simulation_type == 'network congestion':
 
     fig2, ax1 = plt.subplots(figsize=(9, 7), dpi=100)
     ax2 = ax1.twinx()
-    plt.title('Total capacity deployed and network congestion')
-    l1, = ax1.plot(range(1, up.M_max + 1), tot_capacity_deployed, 'b-', label='Deployed capacity')
-    l2, = ax2.plot(range(1, up.M_max + 1), tot_congestion, 'r-', label='Network final congestion')
+    plt.title('Total capacity deployed and network final congestion')
+    l1, = ax1.plot(range(1, up.M_max + 1), tot_capacity_deployed, 'b-', label='Capacity')
+    l2, = ax2.plot(range(1, up.M_max + 1), tot_congestion, 'r-', label='Congestion')
     ax1.set_xlabel('M')
     ax1.set_ylabel('C(Gbps)')
     ax2.set_ylabel('Network congestion (%)')
     plt.xticks(range(1, up.M_max + 1))
-    # ax1.grid(color='gray', which='major', linestyle='--')
+    # ax1.grid(color='gray', which='major', axis='y', linestyle='--')
     # plt.gca().set_axisbelow(True)
     p = [l1, l2]
     ax1.legend(p, [p_.get_label() for p_ in p], loc='lower center')
@@ -188,12 +189,11 @@ if simulation_type == 'network congestion':
     plt.plot(range(1, up.M_max + 1), [len(tot_accepted_Rb[x]) for x in range(len(tot_accepted_Rb))], 'b-',
              label='Accepted')
     plt.plot(range(1, up.M_max + 1), tot_rejections, 'r-', label='Rejected')
-    plt.axhline(y=sum([len(tot_accepted_Rb[x]) for x in range(len(tot_accepted_Rb))]) / len(tot_accepted_Rb),
-                color='c', linestyle=':', label='Accepted mean')
-    plt.gca().set_xlabel('Monte Carlo runs')
+    mean = sum([len(tot_accepted_Rb[x]) for x in range(len(tot_accepted_Rb))]) / len(tot_accepted_Rb)
+    plt.axhline(y=mean, color='c', linestyle=':', label='Accepted mean')
+    plt.gca().set_xlabel('M')
     plt.gca().set_ylabel('Number of connections')
-    plt.annotate(str(sum([len(tot_accepted_Rb[x]) for x in range(len(tot_accepted_Rb))]) / len(tot_accepted_Rb)),
-                 xy=(1, 1+sum([len(tot_accepted_Rb[x]) for x in range(len(tot_accepted_Rb))]) / len(tot_accepted_Rb)))
+    plt.annotate('{:.2f}'.format(mean), xy=(1, 2.5+mean))
     plt.xticks(range(1, up.M_max + 1))
     plt.grid(color='gray', which='major', axis='y', linestyle='--')
     plt.gca().set_axisbelow(True)
@@ -201,7 +201,7 @@ if simulation_type == 'network congestion':
 
 else:
     # Set fixed capacity for uniform traffic matrix
-    M = 30
+    M = 25
     for m in range(1, up.MC + 1):
         # Generate uniform traffic matrix with M*100Gbps capacity per line
         traffic_matrix = up.generate_traffic_matrix(pd.DataFrame(index=network.nodes.keys(),
@@ -209,6 +209,8 @@ else:
                                                     M)
         # Generate connections and stream them
         connections, congestion = network.manage_traffic_matrix(traffic_matrix)
+        # Show progresses
+        print('Run '+str(m), f': {congestion}%')
         # Save parameters for future analysis
         tot_snr.append([connection.snr for connection in connections if connection.snr != 0])
         tot_avg_snr.append(sum(tot_snr[m - 1]) / len(tot_snr[m - 1]))
@@ -223,8 +225,8 @@ else:
 
     # Plot results
     plt.figure(figsize=(9, 7), dpi=100)
-    plt.title('GSNR distribution')
-    hist, bins, x = plt.hist(tot_snr, align='mid', bins=20)  # MIGLIORARE PLOT
+    plt.title('GSNR distribution - M={}'.format(M))
+    hist, bins, x = plt.hist(tot_snr, align='mid', bins=20)
     ticks = [(bins[edge] + bins[edge + 1]) / 2 for edge in range(len(bins) - 1)]
     plt.xticks(ticks, rotation=45)
     plt.gca().set_xlabel('GSNR(dB)')
@@ -235,10 +237,9 @@ else:
     plt.legend(legend_param, fontsize='x-small')
 
     plt.figure(figsize=(9, 7), dpi=100)
-    plt.title('Accepted connections Rb')
+    plt.title('Accepted connections Rb - M={}'.format(M))
     if network.nodes['A'].transceiver == 'flex_rate':
         hist1, bins1, x = plt.hist(tot_accepted_Rb, align='mid', bins=4)
-        # plt.xticks(np.arange(125, 400, step=75), [100, 200, 300, 400], rotation=45)
         ticks1 = [(bins1[edge] + bins1[edge + 1]) / 2 for edge in range(len(bins1) - 1)]
         plt.xticks(ticks1, [100, 200, 300, 400])
     else:
@@ -253,14 +254,14 @@ else:
 
     fig1, ax1_1 = plt.subplots(figsize=(9, 7), dpi=100)
     ax2_1 = ax1_1.twinx()
-    plt.title('Average Rb(M) and GSNR(M)')
-    line1, = ax1_1.plot(range(1, up.MC + 1), tot_avg_Rb, 'b-', label='Average deployed Rb per-line')
-    line2, = ax2_1.plot(range(1, up.MC + 1), tot_avg_snr, 'r-', label='Average per-line GSNR')
+    plt.title('Average Rb(M) and GSNR(M) per-line - M={}'.format(M))
+    line1, = ax1_1.plot(range(1, up.MC + 1), tot_avg_Rb, 'b-', label='Rb')
+    line2, = ax2_1.plot(range(1, up.MC + 1), tot_avg_snr, 'r-', label='GSNR')
     ax1_1.set_xlabel('Monte Carlo runs')
     ax1_1.set_ylabel('Rb(Gbps)')
     ax2_1.set_ylabel('GSNR(dB)')
-    secay = ax2_1.secondary_yaxis('right')
-    secay.set_yticks(np.arange(25, 27.5, 0.1))
+    # secay = ax2_1.secondary_yaxis('right')
+    # secay.set_yticks(np.arange(25, 27.5, 0.1))
     plt.xticks(range(1, up.MC + 1))
     # ax1_1.grid(color='gray', which='major', linestyle='--')
     # ax2_1.grid(color='gray', which='major', axis='y', linestyle=':')
@@ -270,9 +271,9 @@ else:
 
     fig2, ax1 = plt.subplots(figsize=(9, 7), dpi=100)
     ax2 = ax1.twinx()
-    plt.title('Total capacity deployed and network congestion')
-    l1, = ax1.plot(range(1, up.MC + 1), tot_capacity_deployed, 'b-', label='Deployed capacity')
-    l2, = ax2.plot(range(1, up.MC + 1), tot_congestion, 'r-', label='Network final congestion')
+    plt.title('Total capacity deployed and network final congestion')
+    l1, = ax1.plot(range(1, up.MC + 1), tot_capacity_deployed, 'b-', label='Capacity')
+    l2, = ax2.plot(range(1, up.MC + 1), tot_congestion, 'r-', label='Congestion')
     ax1.set_xlabel('Monte Carlo runs')
     ax1.set_ylabel('C(Gbps)')
     ax2.set_ylabel('Network congestion (%)')
@@ -288,12 +289,11 @@ else:
     plt.plot(range(1, up.MC + 1), [len(tot_accepted_Rb[x]) for x in range(len(tot_accepted_Rb))], 'b-',
              label='Accepted')
     plt.plot(range(1, up.MC + 1), tot_rejections, 'r-', label='Rejected')
-    plt.axhline(y=sum([len(tot_accepted_Rb[x]) for x in range(len(tot_accepted_Rb))]) / len(tot_accepted_Rb),
-                color='c', linestyle=':', label='Accepted mean')
+    mean = sum([len(tot_accepted_Rb[x]) for x in range(len(tot_accepted_Rb))]) / len(tot_accepted_Rb)
+    plt.axhline(y=mean, color='c', linestyle=':', label='Accepted mean')
     plt.gca().set_xlabel('Monte Carlo runs')
     plt.gca().set_ylabel('Number of connections')
-    plt.annotate(str(sum([len(tot_accepted_Rb[x]) for x in range(len(tot_accepted_Rb))]) / len(tot_accepted_Rb)),
-                 xy=(1, 1+sum([len(tot_accepted_Rb[x]) for x in range(len(tot_accepted_Rb))]) / len(tot_accepted_Rb)))
+    plt.annotate('{:.2f}'.format(mean), xy=(1, 2.5 + mean))
     plt.xticks(range(1, up.MC + 1))
     plt.grid(color='gray', which='major', axis='y', linestyle='--')
     plt.gca().set_axisbelow(True)
