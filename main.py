@@ -15,11 +15,13 @@ import utils_and_param as up
 # f = open('Lab07/nodes_full.json')
 # f = open('Lab07/nodes_not_full.json')
 # f = open('Lab07/nodes_full_fixed_rate.json')
-f = open('Lab07/nodes_full_flex_rate.json')
+# f = open('Lab07/nodes_full_flex_rate.json')
 # f = open('Lab07/nodes_full_shannon.json')
 
 # Open and import personalized JSON file
 f = open('288290/network.json')
+# f = open('288290/full_network.json')
+# f = open('288290/not_full_network.json')
 nodes_dict = json.load(f)
 f.close()
 # print(nodes_dict)
