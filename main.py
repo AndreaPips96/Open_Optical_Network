@@ -8,15 +8,18 @@ from matplotlib.ticker import StrMethodFormatter
 from useful_classes import Network
 from useful_classes import Connection
 from useful_classes import LightPath
-from Lab07 import utils_and_param as up
+import utils_and_param as up
 
-# Open and import JSON file
+# Open and import standard JSON file
 # f = open('Lab03/nodes.json')
 # f = open('Lab07/nodes_full.json')
 # f = open('Lab07/nodes_not_full.json')
 # f = open('Lab07/nodes_full_fixed_rate.json')
 f = open('Lab07/nodes_full_flex_rate.json')
 # f = open('Lab07/nodes_full_shannon.json')
+
+# Open and import personalized JSON file
+f = open('288290/network.json')
 nodes_dict = json.load(f)
 f.close()
 # print(nodes_dict)
@@ -28,7 +31,8 @@ f.close()
 network = Network(nodes_dict)
 # network.draw()
 network.connect()
-
+network.draw(save=False)
+exit()
 # Find all possible paths in the network
 paths = []
 for node1 in network.nodes.keys():

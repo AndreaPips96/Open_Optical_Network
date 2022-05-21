@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 from copy import deepcopy
-from Lab07 import utils_and_param as up
+import utils_and_param as up
 
 logging.basicConfig(filename='network.txt', level=logging.INFO, filemode='w')
 # free = 1
@@ -184,17 +184,18 @@ class Network:
             self.nodes[key] = Node(key, my_dict[key])
 
             # LAB7
-            self.default_switching_matrices[key] = my_dict[key]['switching_matrix']
-            # easier way to build the switching matrix BUT needs np.array() before multiplication taken
-            # self.nodes[key].switching_matrix = np.array(my_dict[key]['switching_matrix'])
-            first = True
-            for con_node in my_dict[key]['switching_matrix']:
-                if first:
-                    first = False
-                    self.nodes[key].switching_matrix = self.build_switching_matrix(key, con_node, my_dict)
-                else:
-                    self.nodes[key].switching_matrix.update(self.build_switching_matrix(key, con_node, my_dict))
-            #
+            if 'switching_matrix' in my_dict.values():
+                self.default_switching_matrices[key] = ['switching_matrix']
+                # easier way to build the switching matrix BUT needs np.array() before multiplication taken
+                # self.nodes[key].switching_matrix = np.array(my_dict[key]['switching_matrix'])
+                first = True
+                for con_node in my_dict[key]['switching_matrix']:
+                    if first:
+                        first = False
+                        self.nodes[key].switching_matrix = self.build_switching_matrix(key, con_node, my_dict)
+                    else:
+                        self.nodes[key].switching_matrix.update(self.build_switching_matrix(key, con_node, my_dict))
+                #
 
             for element in self.nodes[key].connected_nodes:
                 line_label = (key + element)
@@ -270,9 +271,9 @@ class Network:
         node = self.nodes[lightpath.path[0]]
         node.propagate(lightpath)
 
-    def draw(self):
+    def draw(self, save=False):
         """
-            This function has to draw the network using matplotlib
+            This function draws the network using matplotlib
             (nodes as dots and connection as lines).
         """
         fig = plt.figure()
@@ -289,7 +290,11 @@ class Network:
                 y1 = n1.position[1]
                 plt.plot([x0, x1], [y0, y1], 'b', zorder=0, linewidth=2)
         plt.title('Network topology')
-        # fig.savefig('Network_topology.png')
+        plt.xlabel('Distance (m)')
+        plt.xlabel('Distance (m)')
+        plt.ticklabel_format(axis='both', style='sci', scilimits=(3, 3))
+        if save:
+            fig.savefig('Network_topology.png')
         plt.show()
 
     # LAB 4
