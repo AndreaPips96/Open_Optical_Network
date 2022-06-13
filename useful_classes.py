@@ -44,33 +44,41 @@ class Node:
         if 'transceiver' in dictionary.keys():                  # LAB 7 - string
             self.transceiver = dictionary['transceiver']
         else:
-            self.transceiver = 'fixed_rate'
+            self.transceiver = 'shannon'
 
-    def propagate(self, lightpath):
-        # LAB 9
-        # check for last node not reached
-        if len(lightpath.path) > 1:
-            # LAB 7
-            # set side channel occupancy
-            if len(lightpath.path) > 2:
-                if lightpath.channel+1 < 10:
+    def propagate(self, lightpath, dynamic_sw):
+        if not dynamic_sw:
+            if len(lightpath.path) > 1:
+                next_line = self.successive[self.label + lightpath.path[1]]
+                lightpath.signal_power = next_line.optimized_launch_power()
+                lightpath.update_path()
+                # call the successive element propagate method, accordingly to the specified path.
+                self.successive[next_line.label].propagate(lightpath, dynamic_sw)
+        else:
+            # LAB 9
+            # check for last node not reached
+            if len(lightpath.path) > 1:
+                # LAB 7
+                # set side channel occupancy
+                if len(lightpath.path) > 2:
+                    if lightpath.channel+1 < 10:
+                        self.successive[lightpath.path[:2]].successive[lightpath.path[1]] \
+                            .switching_matrix[lightpath.path[0]][lightpath.path[2]][lightpath.channel+1] = up.OCCUPIED
+                    if lightpath.channel-1 >= 0:
+                        self.successive[lightpath.path[:2]].successive[lightpath.path[1]] \
+                            .switching_matrix[lightpath.path[0]][lightpath.path[2]][lightpath.channel-1] = up.OCCUPIED
                     self.successive[lightpath.path[:2]].successive[lightpath.path[1]] \
-                        .switching_matrix[lightpath.path[0]][lightpath.path[2]][lightpath.channel+1] = up.OCCUPIED
-                if lightpath.channel-1 >= 0:
-                    self.successive[lightpath.path[:2]].successive[lightpath.path[1]] \
-                        .switching_matrix[lightpath.path[0]][lightpath.path[2]][lightpath.channel-1] = up.OCCUPIED
-                self.successive[lightpath.path[:2]].successive[lightpath.path[1]] \
-                    .switching_matrix[lightpath.path[0]][lightpath.path[2]][lightpath.channel] = up.OCCUPIED
+                        .switching_matrix[lightpath.path[0]][lightpath.path[2]][lightpath.channel] = up.OCCUPIED
 
-            next_line = self.successive[self.label + lightpath.path[1]]
-            lightpath.signal_power = next_line.optimized_launch_power()
-            lightpath.update_path()
-            # call the successive element propagate method, accordingly to the specified path.
-            self.successive[next_line.label].propagate(lightpath)
-            # if lightpath.path != '':
-            #     call the successive element propagate method, accordingly to the specified path.
-            #     next_label = lightpath.path[0]
-            #     self.successive[self.label + next_label].propagate(lightpath)
+                next_line = self.successive[self.label + lightpath.path[1]]
+                lightpath.signal_power = next_line.optimized_launch_power()
+                lightpath.update_path()
+                # call the successive element propagate method, accordingly to the specified path.
+                self.successive[next_line.label].propagate(lightpath, dynamic_sw)
+                # if lightpath.path != '':
+                #     call the successive element propagate method, accordingly to the specified path.
+                #     next_label = lightpath.path[0]
+                #     self.successive[self.label + next_label].propagate(lightpath)
 
     # LAB 5
     def probe(self, lightpath):
@@ -110,11 +118,11 @@ class Line:
     def noise_generation(self, lightpath):
         # return 1e-9 * signal_power * self.length
         # LAB 9
-        # print('ASE: '+str(self.ase_generation())+' NLI: '+str(self.nli_generation(lightpath)))  # debug & workflow print
-        pnli = self.nli_generation(lightpath)       # DEBUG
+        # print('ASE: '+str(self.ase_generation())+' NLI: '+str(self.nli_generation(lightpath)))  # DEBUG
+        # pnli = self.nli_generation(lightpath)       # DEBUG
         return self.ase_generation() + self.nli_generation(lightpath)
 
-    def propagate(self, lightpath):
+    def propagate(self, lightpath, dynamic_sw):
         """
             Method to propagate a lightpath on all lines along a path
         """
@@ -123,7 +131,7 @@ class Line:
         # Set line status to occupied then propagate signal - LAB 4
         self.state[lightpath.channel] = up.OCCUPIED  # LAB 5
         next_label = lightpath.path[0]
-        self.successive[next_label].propagate(lightpath)
+        self.successive[next_label].propagate(lightpath, dynamic_sw)
 
     # LAB 5
     def probe(self, lightpath):
@@ -184,18 +192,18 @@ class Network:
             self.nodes[key] = Node(key, my_dict[key])
 
             # LAB7
-            if 'switching_matrix' in my_dict.values():
-                self.default_switching_matrices[key] = ['switching_matrix']
-                # easier way to build the switching matrix BUT needs np.array() before multiplication taken
-                # self.nodes[key].switching_matrix = np.array(my_dict[key]['switching_matrix'])
-                first = True
-                for con_node in my_dict[key]['switching_matrix']:
-                    if first:
-                        first = False
-                        self.nodes[key].switching_matrix = self.build_switching_matrix(key, con_node, my_dict)
-                    else:
-                        self.nodes[key].switching_matrix.update(self.build_switching_matrix(key, con_node, my_dict))
-                #
+            # if 'switching_matrix' in my_dict[key].keys():
+            self.default_switching_matrices[key] = my_dict[key]['switching_matrix']
+            # easier way to build the switching matrix BUT needs np.array() before multiplication taken
+            # self.nodes[key].switching_matrix = np.array(my_dict[key]['switching_matrix'])
+            first = True
+            for con_node in my_dict[key]['switching_matrix']:
+                if first:
+                    first = False
+                    self.nodes[key].switching_matrix = self.build_switching_matrix(key, con_node, my_dict)
+                else:
+                    self.nodes[key].switching_matrix.update(self.build_switching_matrix(key, con_node, my_dict))
+            #
 
             for element in self.nodes[key].connected_nodes:
                 line_label = (key + element)
@@ -263,20 +271,20 @@ class Network:
                 out.append(string1 + letter)
         return out
 
-    def propagate(self, lightpath):
+    def propagate(self, lightpath, dynamic_sw):
         """
             This function has to propagate the signal information through the path specified in it
             and returns the modified spectral information.
         """
         node = self.nodes[lightpath.path[0]]
-        node.propagate(lightpath)
+        node.propagate(lightpath, dynamic_sw)
 
     def draw(self, save=False):
         """
             This function draws the network using matplotlib
             (nodes as dots and connection as lines).
         """
-        fig = plt.figure()
+        fig = plt.figure(figsize=(9, 7), dpi=100)
         for label in self.nodes:
             node = self.nodes[label]
             x0 = node.position[0]
@@ -292,10 +300,10 @@ class Network:
         plt.title('Network topology')
         plt.xlabel('Distance (m)')
         plt.xlabel('Distance (m)')
-        plt.ticklabel_format(axis='both', style='sci', scilimits=(3, 3))
+        plt.ticklabel_format(axis='both', style='sci', scilimits=(3, 3), useMathText=True)
         if save:
             fig.savefig('Network_topology.png')
-        plt.show()
+        # plt.show()
 
     # LAB 4
     def find_best_snr(self, snode, dnode):
@@ -372,7 +380,7 @@ class Network:
                 # print(path, channel)
                 # i = i + 1
                 # signal = LightPath(channel - 1, path)
-                self.propagate(signal)
+                self.propagate(signal, dynamic_sw=True)
                 if parameter == 'latency':
                     connection.latency = best_lat
                     # connection.snr = 10 * np.log10(signal.signal_power / signal.noise_power)
@@ -524,15 +532,9 @@ class Network:
 
     # LAB 9
     def manage_traffic_matrix(self, traffic_matrix):
-        self.cnt = 0
-        if self.nodes[list(self.nodes.keys())[0]].transceiver == 'fixed_rate':
-            MAX_REJ = 15
-        elif self.nodes[list(self.nodes.keys())[0]].transceiver == 'flex_rate':
-            MAX_REJ = 20
-        else:
-            MAX_REJ = 25
-
-        rejection_consecutive_cnt = 0
+        MAX_REJ = 15.0
+        rejection_cnt = 0
+        rejection_perc = 0.0
         congestion_percentage = 0.0
         connections = []
         non_zero_request = []
@@ -545,7 +547,7 @@ class Network:
         # Create new connections until either the traffic matrix is null, the network is saturated or too many
         # consecutive blocking events
         # while not congested and not null matrix:
-        while (int(congestion_percentage) < 100) and non_zero_request and rejection_consecutive_cnt <= MAX_REJ:
+        while (int(congestion_percentage) < 100) and non_zero_request and rejection_perc <= MAX_REJ:
             # Choose a new random connection among available ones
             nodes = random.choice(non_zero_request)
             source = nodes[0]
@@ -560,9 +562,6 @@ class Network:
 
             # If connection wasn't rejected update traffic matrix and congestion
             if connection.snr != 0 and connection.latency != 'None':
-                if rejection_consecutive_cnt != 0:
-                    # print(rejection_consecutive_cnt)
-                    rejection_consecutive_cnt = 0
                 if traffic_matrix[source][destination] - connection.bit_rate > 0:
                     traffic_matrix[source][destination] -= connection.bit_rate
                 elif traffic_matrix[source][destination] - connection.bit_rate == 0:
@@ -574,10 +573,10 @@ class Network:
                     non_zero_request.remove(nodes)
                 congestion_percentage = up.congestion_eval(self)
                 # print(congestion_percentage)
-            # If connection was rejected count consecutive rejections: if more than X consecutive means that network is
-            # somehow unable to accept more connections
+            # If connection was rejected count rejections: if more than 15% exit because of too many rejections
             else:
-                rejection_consecutive_cnt += 1
+                rejection_cnt += 1
+                rejection_perc = rejection_cnt/len(connections)*100
 
         info = str(congestion_percentage) + ' [' + ''.join(x for x in non_zero_request) + ']'
         unavailable_ch = 0
@@ -588,16 +587,18 @@ class Network:
         lines = '0s:' + str(unavailable_ch) + ' ' + '1s:' + str(available_ch) + ' - Paths>2: ' + str(self.cnt)
         logging.info(info)
         logging.info(lines)
-        # print(f'{congestion_percentage}%')
+        # print(f'{congestion_percentage}%'
 
+        return connections, congestion_percentage
+
+    def restore(self):
         # Reset network for future experiments
         for node in self.nodes:
             self.nodes[node].switching_matrix = deepcopy(dict(self.default_switching_matrices[node]))
         for line in self.lines:
             self.lines[line].state = np.array([up.FREE] * 10)
         self.build_route_space()
-
-        return connections, congestion_percentage
+        return
 
 
 class Connection:

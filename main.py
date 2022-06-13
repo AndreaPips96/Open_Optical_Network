@@ -5,10 +5,17 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import StrMethodFormatter
+from matplotlib.ticker import ScalarFormatter
 from useful_classes import Network
 from useful_classes import Connection
 from useful_classes import LightPath
 import utils_and_param as up
+
+
+class ScalarFormatterClass(ScalarFormatter):
+    def _set_format(self):
+        self.format = "%1.2f"
+
 
 # Open and import standard JSON file
 # f = open('Lab03/nodes.json')
@@ -19,8 +26,8 @@ import utils_and_param as up
 # f = open('Lab07/nodes_full_shannon.json')
 
 # Open and import personalized JSON file
-f = open('288290/network.json')
-# f = open('288290/full_network.json')
+# f = open('288290/network.json')
+f = open('288290/full_network.json')
 # f = open('288290/not_full_network.json')
 nodes_dict = json.load(f)
 f.close()
@@ -33,8 +40,8 @@ f.close()
 network = Network(nodes_dict)
 # network.draw()
 network.connect()
-network.draw(save=False)
-exit()
+# network.draw(save=False)
+# exit()
 # Find all possible paths in the network
 paths = []
 for node1 in network.nodes.keys():
@@ -65,6 +72,36 @@ network_df['SNR [dB]'] = snr
 # LAB 4 (propagate) + LAB 5 (probe)
 # Set weighted_paths attribute
 network.weighted_paths = network_df
+# plot = True
+plot = False
+if plot:
+    plt.figure(figsize=(9, 7), dpi=100)
+    plt.title('GSNR distribution')
+    hist, bins, x = plt.hist(network.weighted_paths['SNR [dB]'], bins=20, rwidth=0.8)
+    ticks = [(bins[edge] + bins[edge + 1]) / 2 for edge in range(len(bins) - 1)]
+    plt.xticks(ticks, rotation=45)
+    plt.gca().set_xlabel('GSNR(dB)')
+    plt.gca().xaxis.set_major_formatter(StrMethodFormatter('{x:,.1f}'))
+    plt.grid(color='gray', which='major', axis='y', linestyle='--')
+    plt.gca().set_axisbelow(True)
+
+    plt.figure(figsize=(8, 6), dpi=80)
+    plt.title('Latency distribution')
+    hist, bins, x = plt.hist(network.weighted_paths['Latency [s]'], bins=20, rwidth=0.8)
+    ticks = [(bins[edge] + bins[edge + 1]) / 2 for edge in range(len(bins) - 1)]
+    plt.xticks(ticks, rotation=45)
+    plt.gca().set_xlabel('Latency (s)')
+    xScalarFormatter = ScalarFormatterClass(useMathText=True)
+    xScalarFormatter.set_powerlimits((-3, -3))
+    plt.gca().xaxis.set_major_formatter(xScalarFormatter)
+    # plt.ticklabel_format(axis='x', style='sci', scilimits=(-3, -3), useMathText=True)
+    plt.grid(color='gray', which='major', axis='y', linestyle='--')
+    plt.gca().set_axisbelow(True)
+    # plt.show()
+
+    print(network.weighted_paths['SNR [dB]'].mean(), network.weighted_paths['Latency [s]'].mean(), '\n',
+          network.weighted_paths['SNR [dB]'].std(), network.weighted_paths['Latency [s]'].std())
+
 # LAB 5
 # Set route_space attribute
 # network.route_space = pd.DataFrame([[line.state for line in network.lines.values()]], index=paths, columns=network.lines)
@@ -107,6 +144,7 @@ tot_rejections = []
 tot_perc_allocations = []
 tot_connections = []
 legend_param = []
+avg_perc_lines = [0.0] * len(network.lines.keys())
 if simulation_type == 'network congestion':
     for M in range(1, up.M_max+1):
         # Generate uniform traffic matrix with M*100Gbps capacity per line
@@ -116,7 +154,7 @@ if simulation_type == 'network congestion':
         # Generate connections and stream them
         connections, congestion = network.manage_traffic_matrix(traffic_matrix)
         # Show progresses
-        print('Run '+str(M), f': {congestion}%')
+        print('Run '+str(M), f': {congestion:.2f}%')
         # Save parameters for future analysis
         tot_snr.append([connection.snr for connection in connections if connection.snr != 0])
         tot_avg_snr.append(sum(tot_snr[M-1]) / len(tot_snr[M-1]))
@@ -128,6 +166,10 @@ if simulation_type == 'network congestion':
         tot_perc_allocations.append(len(tot_accepted_Rb[M-1]) / len(connections) * 100)
         tot_connections.append(len(connections))
         legend_param.append(str(M*100)+'Gbps requests')
+        avg_perc_lines = [(a + b) / 2 for a, b in zip(avg_perc_lines, up.line_occupancy(network.lines))]
+
+        # Restore network for next Monte Carlo run
+        network.restore()
 
     # Plot results
     plt.figure(figsize=(9, 7), dpi=100)
@@ -135,12 +177,22 @@ if simulation_type == 'network congestion':
     hist, bins, x = plt.hist(tot_snr, align='mid', bins=20)
     ticks = [(bins[edge] + bins[edge + 1]) / 2 for edge in range(len(bins) - 1)]
     plt.xticks(ticks, rotation=45)
+    labels = [str('{:.1f}'.format(i)) for i in ticks]
     plt.gca().set_xlabel('GSNR(dB)')
     plt.gca().set_ylabel('Number of connections')
     plt.gca().xaxis.set_major_formatter(StrMethodFormatter('{x:,.1f}'))
     plt.grid(color='gray', which='major', axis='y', linestyle='--')
     plt.gca().set_axisbelow(True)
-    plt.legend(legend_param, fontsize='x-small')
+    # plt.legend(legend_param, fontsize='x-small')
+
+    plt.figure(figsize=(9, 7), dpi=100)
+    plt.title('Average number of connections per GSNR value')
+    plt.bar(labels, sum(hist)/len(hist), align='center')
+    plt.xticks(rotation=45)
+    plt.gca().set_xlabel('GSNR(dB)')
+    plt.gca().set_ylabel('Average number of connections')
+    plt.grid(color='gray', which='major', axis='y', linestyle='--')
+    plt.gca().set_axisbelow(True)
 
     plt.figure(figsize=(9, 7), dpi=100)
     plt.title('Accepted connections Rb')
@@ -148,15 +200,30 @@ if simulation_type == 'network congestion':
         hist1, bins1, x = plt.hist(tot_accepted_Rb, align='mid', bins=4)
         ticks1 = [(bins1[edge] + bins1[edge + 1]) / 2 for edge in range(len(bins1) - 1)]
         plt.xticks(ticks1, [100, 200, 300, 400])
+        labels1 = [str('{:.1f}'.format(i)) for i in ticks1]
     else:
         hist1, bins1, x = plt.hist(tot_accepted_Rb, align='mid')
         ticks1 = [(bins1[edge] + bins1[edge + 1]) / 2 for edge in range(len(bins1) - 1)]
-        plt.xticks(ticks1)
+        lb = [str('{:.2f}'.format(i)) for i in ticks1]
+        plt.xticks(ticks1, lb)
+        labels1 = [str('{:.1f}'.format(i)) for i in ticks1]
     plt.gca().set_xlabel('Rb(Gbps)')
     plt.gca().set_ylabel('Number of connections')
     plt.grid(color='gray', which='major', axis='y', linestyle='--')
     plt.gca().set_axisbelow(True)
-    plt.legend(legend_param, fontsize='x-small')
+    # plt.legend(legend_param, fontsize='x-small')
+
+    plt.figure(figsize=(9, 7), dpi=100)
+    plt.title('Average number of connections per allocated Rb')
+    if network.nodes['A'].transceiver == 'flex_rate':
+        plt.bar(labels1, sum(hist1) / len(hist1), align='center')
+        plt.xticks(labels1, [100, 200, 300, 400])
+    else:
+        plt.bar(labels1, sum(hist1) / len(hist1), align='center')
+    plt.gca().set_xlabel('Rb(Gbps)')
+    plt.gca().set_ylabel('Average number of connections')
+    plt.grid(color='gray', which='major', axis='y', linestyle='--')
+    plt.gca().set_axisbelow(True)
 
     fig1, ax1_1 = plt.subplots(figsize=(9, 7), dpi=100)
     ax2_1 = ax1_1.twinx()
@@ -166,14 +233,14 @@ if simulation_type == 'network congestion':
     ax1_1.set_xlabel('M')
     ax1_1.set_ylabel('Rb(Gbps)')
     ax2_1.set_ylabel('GSNR(dB)')
-    # secay = ax2_1.secondary_yaxis('right')
-    # secay.set_yticks(np.linspace(25.5, 26.5, 10))
     plt.xticks(range(1, up.M_max + 1))
-    # ax1_1.grid(color='gray', which='major', linestyle='--')
-    # ax2_1.grid(color='gray', which='major', axis='y', linestyle=':')
-    # plt.gca().set_axisbelow(True)
+    ax1_1.set_yticks(np.linspace(ax1_1.get_ybound()[0], ax1_1.get_ybound()[1], 7))
+    ax2_1.set_yticks(np.linspace(ax2_1.get_ybound()[0], ax2_1.get_ybound()[1], 7))
+    plt.gca().yaxis.set_major_formatter(StrMethodFormatter('{x:,.1f}'))
+    ax1_1.grid(color='gray', which='major', axis='y', linestyle='--')
+    plt.gca().set_axisbelow(True)
     p = [line1, line2]
-    ax1_1.legend(p, [p_.get_label() for p_ in p], loc='lower center')
+    ax1_1.legend(p, [p_.get_label() for p_ in p])
 
     fig2, ax1 = plt.subplots(figsize=(9, 7), dpi=100)
     ax2 = ax1.twinx()
@@ -184,10 +251,15 @@ if simulation_type == 'network congestion':
     ax1.set_ylabel('C(Gbps)')
     ax2.set_ylabel('Network congestion (%)')
     plt.xticks(range(1, up.M_max + 1))
+    ax1.set_yticks(np.linspace(ax1.get_ybound()[0], ax1.get_ybound()[1], 7))
+    ax2.set_yticks(np.linspace(ax2.get_ybound()[0], ax2.get_ybound()[1], 7))
+    plt.gca().yaxis.set_major_formatter(StrMethodFormatter('{x:,.1f}'))
+    ax1.grid(color='gray', which='major', axis='y', linestyle='--')
+    plt.gca().set_axisbelow(True)
     # ax1.grid(color='gray', which='major', axis='y', linestyle='--')
     # plt.gca().set_axisbelow(True)
     p = [l1, l2]
-    ax1.legend(p, [p_.get_label() for p_ in p], loc='lower center')
+    ax1.legend(p, [p_.get_label() for p_ in p])
 
     plt.figure(figsize=(9, 7), dpi=100)
     plt.title('Connections')
@@ -205,6 +277,15 @@ if simulation_type == 'network congestion':
     plt.gca().set_axisbelow(True)
     plt.legend()
 
+    plt.figure(figsize=(9, 7), dpi=100)
+    plt.title('Lines average occupancy')
+    plt.bar(network.lines.keys(), avg_perc_lines)
+    plt.gca().set_xlabel('Lines')
+    plt.gca().set_ylabel('Average occupancy (%)')
+    plt.yticks(range(10, 110, 10))
+    plt.grid(color='gray', which='major', axis='y', linestyle='--')
+    plt.gca().set_axisbelow(True)
+
 else:
     # Set fixed capacity for uniform traffic matrix
     M = 25
@@ -216,7 +297,7 @@ else:
         # Generate connections and stream them
         connections, congestion = network.manage_traffic_matrix(traffic_matrix)
         # Show progresses
-        print('Run '+str(m), f': {congestion}%')
+        print('Run '+str(m), f': {congestion}:.2%')
         # Save parameters for future analysis
         tot_snr.append([connection.snr for connection in connections if connection.snr != 0])
         tot_avg_snr.append(sum(tot_snr[m - 1]) / len(tot_snr[m - 1]))
@@ -228,6 +309,10 @@ else:
         tot_perc_allocations.append(len(tot_accepted_Rb[m - 1]) / len(connections) * 100)
         tot_connections.append(len(connections))
         legend_param.append(f'Run {m}')
+        avg_perc_lines = [(a + b) / 2 for a, b in zip(avg_perc_lines, up.line_occupancy(network.lines))]
+
+        # Restore network for next Monte Carlo run
+        network.restore()
 
     # Plot results
     plt.figure(figsize=(9, 7), dpi=100)
@@ -240,7 +325,7 @@ else:
     plt.gca().xaxis.set_major_formatter(StrMethodFormatter('{x:,.1f}'))
     plt.grid(color='gray', which='major', axis='y', linestyle='--')
     plt.gca().set_axisbelow(True)
-    plt.legend(legend_param, fontsize='x-small')
+    # plt.legend(legend_param, fontsize='x-small')
 
     plt.figure(figsize=(9, 7), dpi=100)
     plt.title('Accepted connections Rb - M={}'.format(M))
@@ -256,7 +341,7 @@ else:
     plt.gca().set_ylabel('Number of connections')
     plt.grid(color='gray', which='major', axis='y', linestyle='--')
     plt.gca().set_axisbelow(True)
-    plt.legend(legend_param, fontsize='x-small')
+    # plt.legend(legend_param, fontsize='x-small')
 
     fig1, ax1_1 = plt.subplots(figsize=(9, 7), dpi=100)
     ax2_1 = ax1_1.twinx()
@@ -266,12 +351,12 @@ else:
     ax1_1.set_xlabel('Monte Carlo runs')
     ax1_1.set_ylabel('Rb(Gbps)')
     ax2_1.set_ylabel('GSNR(dB)')
-    # secay = ax2_1.secondary_yaxis('right')
-    # secay.set_yticks(np.arange(25, 27.5, 0.1))
     plt.xticks(range(1, up.MC + 1))
-    # ax1_1.grid(color='gray', which='major', linestyle='--')
-    # ax2_1.grid(color='gray', which='major', axis='y', linestyle=':')
-    # plt.gca().set_axisbelow(True)
+    ax1_1.set_yticks(np.linspace(ax1_1.get_ybound()[0], ax1_1.get_ybound()[1], 7))
+    ax2_1.set_yticks(np.linspace(ax2_1.get_ybound()[0], ax2_1.get_ybound()[1], 7))
+    plt.gca().yaxis.set_major_formatter(StrMethodFormatter('{x:,.1f}'))
+    ax1_1.grid(color='gray', which='major', axis='y', linestyle='--')
+    plt.gca().set_axisbelow(True)
     p = [line1, line2]
     ax1_1.legend(p, [p_.get_label() for p_ in p], loc='lower center')
 
@@ -284,10 +369,15 @@ else:
     ax1.set_ylabel('C(Gbps)')
     ax2.set_ylabel('Network congestion (%)')
     plt.xticks(range(1, up.MC + 1))
+    ax1.set_yticks(np.linspace(ax1.get_ybound()[0], ax1.get_ybound()[1], 7))
+    ax2.set_yticks(np.linspace(ax2.get_ybound()[0], ax2.get_ybound()[1], 7))
+    plt.gca().yaxis.set_major_formatter(StrMethodFormatter('{x:,.1f}'))
+    ax1.grid(color='gray', which='major', axis='y', linestyle='--')
+    plt.gca().set_axisbelow(True)
     # ax1.grid(color='gray', which='major', linestyle='--')
     # plt.gca().set_axisbelow(True)
     p = [l1, l2]
-    ax1.legend(p, [p_.get_label() for p_ in p], loc='lower center')
+    ax1.legend(p, [p_.get_label() for p_ in p])
 
     plt.figure(figsize=(9, 7), dpi=100)
     plt.title('Connections')
@@ -304,6 +394,15 @@ else:
     plt.grid(color='gray', which='major', axis='y', linestyle='--')
     plt.gca().set_axisbelow(True)
     plt.legend()
+
+    plt.figure(figsize=(9, 7), dpi=100)
+    plt.title('Lines average occupancy')
+    plt.bar(network.lines.keys(), avg_perc_lines)
+    plt.gca().set_xlabel('Lines')
+    plt.gca().set_ylabel('Average occupancy (%)')
+    plt.yticks(range(10, 110, 10))
+    plt.grid(color='gray', which='major', axis='y', linestyle='--')
+    plt.gca().set_axisbelow(True)
 # [connection.snr for connection in connections if connection.snr != 0]
 # network.stream(connections, 'latency')
 # lat = [connection.latency for connection in connections if connection.latency != 'None']

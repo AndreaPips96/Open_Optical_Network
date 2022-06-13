@@ -25,8 +25,8 @@ DIST_BTW_AMP = 80e3     # Distance between amplifiers - 80km
 AMP_GAIN = 16           # Amplifiers gain - 16dB
 AMP_NF = 3              # Amplifiers noise figure - 3dB
 
-M_max = 30              # number of increasing M runs for Monte Carlo analysis
-MC = 20                 # number of Monte Carlo analysis for fixed M
+M_max = 25              # number of increasing M runs for Monte Carlo analysis
+MC = 15                 # number of Monte Carlo analysis for fixed M
 
 
 # method for fixed-rate transceivers' bit rate evaluation
@@ -111,14 +111,18 @@ def congestion_eval(Network):
     # print(unavailable_ch, available_ch)
     tot_perc = unavailable_ch * 100 / tot_ch
     return tot_perc
-    # for line in Network.lines.keys():
-    #     # for state in Network.lines[line].state:
-    #     unavailable_ch += np.count_nonzero(Network.lines[line].state == OCCUPIED)
-    #     available_ch += np.sum(Network.lines[line].state)
-    #     # print(Network.lines[line].state)
+
+
+def line_occupancy(lines):
+    occupied_perc = []
+    for line in lines:
+        occupied_perc.append((Nch - np.sum(lines[line].state)) / Nch * 100)
+        # unavailable_ch += np.count_nonzero(Network.lines[line].state == OCCUPIED)
+        # available_ch += np.sum(Network.lines[line].state)
+        # print(network.lines[line].state)
     # print(unavailable_ch, available_ch)
     # tot_perc = unavailable_ch * 100 / tot_ch
-    # return tot_perc
+    return occupied_perc
 
     # for node in Network.nodes.keys():
     #     for channels in Network.nodes[node].switching_matrix.values():
@@ -128,3 +132,5 @@ def congestion_eval(Network):
     #         break
     # tot_perc = tot_perc/len(Network.nodes.keys())
     # return tot_perc
+
+
