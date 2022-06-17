@@ -44,7 +44,7 @@ class Node:
         if 'transceiver' in dictionary.keys():                  # LAB 7 - string
             self.transceiver = dictionary['transceiver']
         else:
-            self.transceiver = 'shannon'
+            self.transceiver = 'fixed_rate'
 
     def propagate(self, lightpath, dynamic_sw):
         if not dynamic_sw:
@@ -380,7 +380,7 @@ class Network:
                 # print(path, channel)
                 # i = i + 1
                 # signal = LightPath(channel - 1, path)
-                self.propagate(signal, dynamic_sw=True)
+                self.propagate(signal, up.dynamic_sw)
                 if parameter == 'latency':
                     connection.latency = best_lat
                     # connection.snr = 10 * np.log10(signal.signal_power / signal.noise_power)
@@ -504,15 +504,16 @@ class Network:
 
     # LAB 6
     def build_switching_matrix(self, node, label1, my_dict):
-        switching_matrix = {}
-        switching_matrix[label1] = {}
-        for label2 in self.nodes[node].connected_nodes:
-            # if label1 == label2:
-            # LAB7
-            if 0 in my_dict[node]['switching_matrix'][label1][label2]:
-                switching_matrix[label1][label2] = np.array([up.OCCUPIED] * up.Nch)
-            else:
-                switching_matrix[label1][label2] = np.array([up.FREE] * up.Nch)
+        # switching_matrix = {}
+        # switching_matrix[label1] = {}
+        # for label2 in self.nodes[node].connected_nodes:
+        #     # if label1 == label2:
+        #     # LAB7
+        #     if 0 in my_dict[node]['switching_matrix'][label1][label2]:
+        #         switching_matrix[label1][label2] = np.array([up.OCCUPIED] * up.Nch)
+        #     else:
+        #         switching_matrix[label1][label2] = np.array([up.FREE] * up.Nch)
+        switching_matrix = deepcopy(dict(self.default_switching_matrices[node]))
         return switching_matrix
 
     # LAB 7 - LAB 9

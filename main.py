@@ -33,6 +33,10 @@ nodes_dict = json.load(f)
 f.close()
 # print(nodes_dict)
 
+# LAB 10 - choose type of simulation
+# simulation_type = 'network congestion'
+simulation_type = 'single traffic matrix'
+
 # Initialize network DataFrame
 # network_df = pd.DataFrame()
 
@@ -97,14 +101,15 @@ if plot:
     # plt.ticklabel_format(axis='x', style='sci', scilimits=(-3, -3), useMathText=True)
     plt.grid(color='gray', which='major', axis='y', linestyle='--')
     plt.gca().set_axisbelow(True)
-    # plt.show()
+    plt.show()
 
     print(network.weighted_paths['SNR [dB]'].mean(), network.weighted_paths['Latency [s]'].mean(), '\n',
           network.weighted_paths['SNR [dB]'].std(), network.weighted_paths['Latency [s]'].std())
-
+# exit()
 # LAB 5
 # Set route_space attribute
-# network.route_space = pd.DataFrame([[line.state for line in network.lines.values()]], index=paths, columns=network.lines)
+# network.route_space = pd.DataFrame([[line.state for line in network.lines.values()]],
+#                                     index=paths, columns=network.lines)
 network.build_route_space()
 
 # 'Channel#' + str(i+1) for i in range(10)]
@@ -128,10 +133,6 @@ network.build_route_space()
 #         destination = random.choice(list(network.nodes.keys()))
 #     connection = Connection(source, destination)
 #     connections.append(connection)
-
-# LAB 10 - choose type of simulation
-simulation_type = 'network congestion'
-# simulation_type = 'single traffic matrix'
 
 # LAB 9
 tot_snr = []
@@ -288,7 +289,7 @@ if simulation_type == 'network congestion':
 
 else:
     # Set fixed capacity for uniform traffic matrix
-    M = 25
+    M = 30
     for m in range(1, up.MC + 1):
         # Generate uniform traffic matrix with M*100Gbps capacity per line
         traffic_matrix = up.generate_traffic_matrix(pd.DataFrame(index=network.nodes.keys(),
@@ -297,7 +298,7 @@ else:
         # Generate connections and stream them
         connections, congestion = network.manage_traffic_matrix(traffic_matrix)
         # Show progresses
-        print('Run '+str(m), f': {congestion}:.2%')
+        print('Run '+str(m), f': {congestion:.2f}%')
         # Save parameters for future analysis
         tot_snr.append([connection.snr for connection in connections if connection.snr != 0])
         tot_avg_snr.append(sum(tot_snr[m - 1]) / len(tot_snr[m - 1]))
@@ -320,12 +321,22 @@ else:
     hist, bins, x = plt.hist(tot_snr, align='mid', bins=20)
     ticks = [(bins[edge] + bins[edge + 1]) / 2 for edge in range(len(bins) - 1)]
     plt.xticks(ticks, rotation=45)
+    labels = [str('{:.1f}'.format(i)) for i in ticks]
     plt.gca().set_xlabel('GSNR(dB)')
     plt.gca().set_ylabel('Number of connections')
     plt.gca().xaxis.set_major_formatter(StrMethodFormatter('{x:,.1f}'))
     plt.grid(color='gray', which='major', axis='y', linestyle='--')
     plt.gca().set_axisbelow(True)
     # plt.legend(legend_param, fontsize='x-small')
+
+    plt.figure(figsize=(9, 7), dpi=100)
+    plt.title('Average number of connections per GSNR value')
+    plt.bar(labels, sum(hist) / len(hist), align='center')
+    plt.xticks(rotation=45)
+    plt.gca().set_xlabel('GSNR(dB)')
+    plt.gca().set_ylabel('Average number of connections')
+    plt.grid(color='gray', which='major', axis='y', linestyle='--')
+    plt.gca().set_axisbelow(True)
 
     plt.figure(figsize=(9, 7), dpi=100)
     plt.title('Accepted connections Rb - M={}'.format(M))
@@ -337,11 +348,24 @@ else:
         hist1, bins1, x = plt.hist(tot_accepted_Rb, align='mid')
         ticks1 = [(bins1[edge] + bins1[edge + 1]) / 2 for edge in range(len(bins1) - 1)]
         plt.xticks(ticks1)
+    labels1 = [str('{:.1f}'.format(i)) for i in ticks1]
     plt.gca().set_xlabel('Rb(Gbps)')
     plt.gca().set_ylabel('Number of connections')
     plt.grid(color='gray', which='major', axis='y', linestyle='--')
     plt.gca().set_axisbelow(True)
     # plt.legend(legend_param, fontsize='x-small')
+
+    plt.figure(figsize=(9, 7), dpi=100)
+    plt.title('Average number of connections per allocated Rb')
+    if network.nodes['A'].transceiver == 'flex_rate':
+        plt.bar(labels1, sum(hist1) / len(hist1), align='center')
+        plt.xticks(labels1, [100, 200, 300, 400])
+    else:
+        plt.bar(labels1, sum(hist1) / len(hist1), align='center')
+    plt.gca().set_xlabel('Rb(Gbps)')
+    plt.gca().set_ylabel('Average number of connections')
+    plt.grid(color='gray', which='major', axis='y', linestyle='--')
+    plt.gca().set_axisbelow(True)
 
     fig1, ax1_1 = plt.subplots(figsize=(9, 7), dpi=100)
     ax2_1 = ax1_1.twinx()
