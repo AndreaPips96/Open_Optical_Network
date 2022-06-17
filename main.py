@@ -439,21 +439,21 @@ else:
 # snr = [connection.snr for connection in connections if connection.snr != 0]
 
 plt.show()
-print()
+
 exit()
 
-bit_rates = [connection.bit_rate for connection in connections if connection.bit_rate != 0]
-print(len(bit_rates))
-avg_bit_rate = np.mean(bit_rates)
-print('Average deployed bit rate: ' + str(avg_bit_rate/1e9) + 'Gbps')
-tot_capacity = np.sum(bit_rates)
-print('Total deployed capacity: ' + str(tot_capacity/1e9) + 'Gbps')
-plt.figure()
-plt.hist(bit_rates)                                           # MIGLIORARE PLOT
-plt.title('Bit rate allocation distribution')
-plt.xticks(rotation=45)
-
-plt.show()
+# bit_rates = [connection.bit_rate for connection in connections if connection.bit_rate != 0]
+# print(len(bit_rates))
+# avg_bit_rate = np.mean(bit_rates)
+# print('Average deployed bit rate: ' + str(avg_bit_rate/1e9) + 'Gbps')
+# tot_capacity = np.sum(bit_rates)
+# print('Total deployed capacity: ' + str(tot_capacity/1e9) + 'Gbps')
+# plt.figure()
+# plt.hist(bit_rates)                                           # MIGLIORARE PLOT
+# plt.title('Bit rate allocation distribution')
+# plt.xticks(rotation=45)
+#
+# plt.show()
 
 # FORMULA P_opt DA MODIFICARE TOGLIENDO Bn? - V
 # SCRIVERE FUNZIONE PER GESTIRE TRAFFIC MATRIX E CONNESSIONI
